@@ -15,11 +15,11 @@ typedef struct Variable {
     Op op;
 } Variable;
 
-#define VAR_INIT(name, value)                                                  \
-    float name##_data[] = value;                                                 \
-    Variable name = variable_new(tensor_new(name##_data));
+#define VAR_INIT(name, ...)                                                  \
+    float name##_data[] = {__VA_ARGS__};                                                 \
+    Variable name = variable_new(tensor_new(name##_data))
 
-#define VAR(name, value) Variable name = (value);
+#define VAR(name, value) Variable name = (value)
 Variable variable_new(Tensor tensor);
 
 #define OP(left, op, right) variable_op((left), (#op), (right))

@@ -26,6 +26,5 @@ typedef struct {
     } while (0)
 
 Tensor tensor_new(float *data);
-Tensor tensor_empty();
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);

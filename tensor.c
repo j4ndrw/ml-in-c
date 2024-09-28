@@ -9,11 +9,6 @@ Tensor tensor_new(float *data) {
     return tensor;
 }
 
-Tensor tensor_empty() {
-    Tensor tensor = {0};
-    return tensor;
-}
-
 Tensor tensor_zeros(size_t length) {
     Tensor zeros = {0};
     zeros.length = length;

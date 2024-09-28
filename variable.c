@@ -37,7 +37,7 @@ Variable variable_op(struct Variable *left, ...) {
     else
         op = OP_LEAF;
 
-    Tensor tensor = tensor_empty();
+    Tensor tensor = tensor_zeros(left->items.length);
     Variable variable = {0};
     variable.left = left;
     variable.right = right;
@@ -49,14 +49,13 @@ Variable variable_op(struct Variable *left, ...) {
     return variable;
 }
 
-Tensor chain_rule_mul(Variable* variable) {
+Tensor chain_rule_mul(Variable *variable) {
     Tensor result = tensor_zeros(variable->grad.length);
     for (int i = 0; i < variable->grad.length; ++i) {
         result.data[i] = variable->items.data[i] * variable->grad.data[i];
     }
     return result;
 }
-
 
 Tensor variable_forward(Variable *root) {
     if (root->left == NULL) {
@@ -96,21 +95,22 @@ Tensor variable_forward(Variable *root) {
     return result;
 }
 
-void variable_backward(Variable* root) {
-    if (root->left == NULL) return;
+void variable_backward(Variable *root) {
+    if (root->left == NULL)
+        return;
 
     switch (root->op) {
-        case OP_ADD:
-        case OP_SUB: {
-            root->left->grad = tensor_ones(root->left->grad.length);
-            root->right->grad = tensor_ones(root->right->grad.length);
-        } break;
-        case OP_MUL: {
-            Tensor left_grad = chain_rule_mul(root->right);
-            Tensor right_grad = chain_rule_mul(root->left);
-            root->left->grad = left_grad;
-            root->right->grad = right_grad;
-        } break;
+    case OP_ADD:
+    case OP_SUB: {
+        root->left->grad = tensor_ones(root->left->grad.length);
+        root->right->grad = tensor_ones(root->right->grad.length);
+    } break;
+    case OP_MUL: {
+        Tensor left_grad = chain_rule_mul(root->right);
+        Tensor right_grad = chain_rule_mul(root->left);
+        root->left->grad = left_grad;
+        root->right->grad = right_grad;
+    } break;
     }
 
     variable_backward(root->left);
