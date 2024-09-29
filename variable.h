@@ -15,13 +15,6 @@ typedef struct Variable {
     Op op;
 } Variable;
 
-#define var_init(NAME, LENGTH, ...)                                            \
-    tensor_new(NAME, LENGTH, __VA_ARGS__);                                     \
-    Variable NAME = variable_new(NAME##_tensor);
-
-#define var_expr(name, value) Variable name = (value)
-Variable variable_new(Tensor tensor);
-
 #define op(left, op, right) variable_op((left), (#op), (right))
 Variable variable_op(struct Variable *left, ...);
 
@@ -34,11 +27,11 @@ void variable_backward(Variable *root);
 Tensor chain_rule_mul(Variable *variable);
 Tensor chain_rule_div(Variable *variable);
 
-#define variable_print(v, kind, ...)                                           \
-    size_t v##_tensor_shape[] = {__VA_ARGS__};                                 \
+#define var_print(v, kind, ...)                                                \
+    size_t v##_tensor_shape[] = __VA_ARGS__;                                 \
     size_t shape_len = ARR_LEN(v##_tensor_shape);                              \
-    if (shape_len)                                                             \
-        tensor_view(&v.kind, v##_tensor_shape);                                \
+    assert(shape_len && "Please specify the shape of the tensor view!");   \
+    tensor_view(&v.kind, v##_tensor_shape);                                    \
     printf("%s.%s = {\n", #v, #kind);                                          \
     {                                                                          \
         printf("\tshape = { ");                                                \
@@ -51,11 +44,23 @@ Tensor chain_rule_div(Variable *variable);
             }                                                                  \
         }                                                                      \
         printf(" }\n");                                                        \
-        printf("\tdata = {\n");                                                 \
+        printf("\tdata = {\n");                                                \
         {                                                                      \
-            int *indices = (int *)malloc(shape_len * sizeof(int));               \
-            tensor_print(&v.kind, shape_len, indices, 0, "\t\t");                      \
+            int *indices = (int *)malloc(shape_len * sizeof(int));             \
+            tensor_print(&v.kind, shape_len, indices, 0, "\t\t");              \
         }                                                                      \
-        printf("\n\t}\n");                                                        \
+        printf("\n\t}\n");                                                     \
     }                                                                          \
     printf("}\n\n");
+
+#define var_new(NAME, LENGTH, ...)                                             \
+    tensor_new(NAME, LENGTH, __VA_ARGS__);                                     \
+    Variable NAME = variable_new(NAME##_tensor);
+#define var_from(NAME, LENGTH, __VA_ARGS__)                                    \
+    Variable NAME = variable_new(__VA_ARGS__);
+Variable variable_new(Tensor tensor);
+
+#define var_expr(name, value) Variable name = (value)
+#define var_rand(NAME, LENGTH, ...)                                            \
+    tensor_rand(NAME, __VA_ARGS__);                                            \
+    var_from(NAME, LENGTH, NAME##_rand_tensor)

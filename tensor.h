@@ -37,7 +37,14 @@ typedef struct {
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);
 
-#define tensor_view(tensor, shape) _tensor_view(tensor, shape, ARR_LEN(shape))
-void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_size);
+#define tensor_rand(NAME, ...)                                                 \
+    size_t NAME##_rand_shape[] = __VA_ARGS__;                                  \
+    Tensor NAME##_rand_tensor =                                                \
+        _tensor_rand(NAME##_rand_shape, ARR_LEN(NAME##_rand_shape));
+Tensor _tensor_rand(size_t shape[], size_t shape_len);
 
-void tensor_print(Tensor *tensor, size_t shape_size, int* indices, int depth, char* prefix);
+#define tensor_view(tensor, shape) _tensor_view(tensor, shape, ARR_LEN(shape))
+void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_len);
+
+void tensor_print(Tensor *tensor, size_t shape_len, int *indices, int depth,
+                  char *prefix);
