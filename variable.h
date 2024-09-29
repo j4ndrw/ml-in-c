@@ -5,7 +5,7 @@
 
 #include "tensor.h"
 
-typedef enum { OP_LEAF, OP_ADD, OP_MUL, OP_SUB } Op;
+typedef enum { OP_LEAF, OP_ADD, OP_MUL } Op;
 
 typedef struct Variable {
     struct Variable *left;
@@ -36,31 +36,26 @@ Tensor chain_rule_div(Variable *variable);
 
 #define variable_print(v, kind, ...)                                           \
     size_t v##_tensor_shape[] = {__VA_ARGS__};                                 \
-    if (ARR_LEN(v##_tensor_shape) > 0)                                         \
-        v.kind = *tensor_view(&v.kind, v##_tensor_shape);                      \
+    size_t shape_len = ARR_LEN(v##_tensor_shape);                              \
+    if (shape_len)                                                             \
+        tensor_view(&v.kind, v##_tensor_shape);                                \
     printf("%s.%s = {\n", #v, #kind);                                          \
     {                                                                          \
         printf("\tshape = { ");                                                \
         {                                                                      \
-                                                                               \
-            for (size_t i = 0; i < ARR_LEN(v##_tensor_shape); ++i) {           \
-                if (i == ARR_LEN(v##_tensor_shape) - 1)                        \
+            for (size_t i = 0; i < shape_len; ++i) {                           \
+                if (i == shape_len - 1)                                        \
                     printf("%zu", v.kind.shape[i]);                            \
                 else                                                           \
                     printf("%zu, ", v.kind.shape[i]);                          \
             }                                                                  \
         }                                                                      \
         printf(" }\n");                                                        \
-        printf("\tdata = {\n");                                                \
+        printf("\tdata = {\n");                                                 \
         {                                                                      \
-            for (size_t i = 0; i < ARR_LEN(v##_tensor_shape); ++i) {           \
-                printf("\t\t[\n");                                             \
-                for (size_t j = 0; j < v##_tensor_shape[i]; ++j) {             \
-                    printf("\t\t\t%f ", v.kind.data[j]);                       \
-                }                                                              \
-                printf("\n\t\t]\n");                                           \
-            }                                                                  \
+            int *indices = (int *)malloc(shape_len * sizeof(int));               \
+            tensor_print(&v.kind, shape_len, indices, 0, "\t\t");                      \
         }                                                                      \
-        printf(" }\n");                                                        \
+        printf("\n\t}\n");                                                        \
     }                                                                          \
     printf("}\n\n");

@@ -22,17 +22,17 @@ Variable variable_op(struct Variable *left, ...) {
     char *op_str = va_arg(args, char *);
     struct Variable *right = va_arg(args, struct Variable *);
 
-    if (strcmp(op_str, "+") != 0 && strcmp(op_str, "-") != 0 &&
-        strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0) {
-        fprintf(stderr, "Invalid op character. Found %s\n", op_str);
+    if (strcmp(op_str, "+") != 0 && strcmp(op_str, "*") != 0) {
+        fprintf(
+            stderr,
+            "Invalid op character. Expected one of {'+', '*'}, but found %s\n",
+            op_str);
         exit(EXIT_FAILURE);
     }
 
     Op op;
     if (strcmp(op_str, "+") == 0)
         op = OP_ADD;
-    else if (strcmp(op_str, "-") == 0)
-        op = OP_SUB;
     else if (strcmp(op_str, "*") == 0)
         op = OP_MUL;
     else
@@ -77,14 +77,6 @@ Tensor variable_forward(Variable *root) {
         return result;
     }
 
-    if (root->op == OP_SUB) {
-        for (size_t i = 0; i < length; ++i) {
-            result.data[i] =
-                root->left->items.data[i] - root->right->items.data[i];
-        }
-        return result;
-    }
-
     if (root->op == OP_MUL) {
         for (size_t i = 0; i < length; ++i) {
             result.data[i] =
@@ -101,8 +93,7 @@ void variable_backward(Variable *root) {
         return;
 
     switch (root->op) {
-    case OP_ADD:
-    case OP_SUB: {
+    case OP_ADD: {
         root->left->grad = tensor_ones(root->left->grad.length);
         root->right->grad = tensor_ones(root->right->grad.length);
     } break;

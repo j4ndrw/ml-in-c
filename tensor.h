@@ -31,11 +31,13 @@ typedef struct {
     float NAME##_data[] = __VA_ARGS__;                                         \
                                                                                \
     NAME##_tensor.data = NAME##_data;                                          \
-    NAME##_tensor.length = LENGTH;
+    NAME##_tensor.length = LENGTH;                                             \
+    NAME##_tensor.shape = (size_t *)malloc(sizeof(size_t));
 
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);
 
 #define tensor_view(tensor, shape) _tensor_view(tensor, shape, ARR_LEN(shape))
-Tensor* _tensor_view(Tensor *tensor, size_t shape[], size_t shape_size);
+void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_size);
 
+void tensor_print(Tensor *tensor, size_t shape_size, int* indices, int depth, char* prefix);
