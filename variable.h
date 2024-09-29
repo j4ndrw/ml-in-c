@@ -15,21 +15,52 @@ typedef struct Variable {
     Op op;
 } Variable;
 
-#define VAR_INIT(name, ...)                                                  \
-    float name##_data[] = {__VA_ARGS__};                                                 \
-    Variable name = variable_new(tensor_new(name##_data))
+#define var_init(NAME, LENGTH, ...)                                            \
+    tensor_new(NAME, LENGTH, __VA_ARGS__);                                     \
+    Variable NAME = variable_new(NAME##_tensor);
 
-#define VAR(name, value) Variable name = (value)
+#define var_expr(name, value) Variable name = (value)
 Variable variable_new(Tensor tensor);
 
-#define OP(left, op, right) variable_op((left), (#op), (right))
+#define op(left, op, right) variable_op((left), (#op), (right))
 Variable variable_op(struct Variable *left, ...);
 
-#define FORWARD(x) variable_forward((x))
+#define forward(x) variable_forward((x))
 Tensor variable_forward(Variable *root);
 
-#define BACKWARD(x) variable_backward((x))
-void variable_backward(Variable* root);
+#define backward(x) variable_backward((x))
+void variable_backward(Variable *root);
 
 Tensor chain_rule_mul(Variable *variable);
 Tensor chain_rule_div(Variable *variable);
+
+#define variable_print(v, kind, ...)                                           \
+    size_t v##_tensor_shape[] = {__VA_ARGS__};                                 \
+    if (ARR_LEN(v##_tensor_shape) > 0)                                         \
+        v.kind = *tensor_view(&v.kind, v##_tensor_shape);                      \
+    printf("%s.%s = {\n", #v, #kind);                                          \
+    {                                                                          \
+        printf("\tshape = { ");                                                \
+        {                                                                      \
+                                                                               \
+            for (size_t i = 0; i < ARR_LEN(v##_tensor_shape); ++i) {           \
+                if (i == ARR_LEN(v##_tensor_shape) - 1)                        \
+                    printf("%zu", v.kind.shape[i]);                            \
+                else                                                           \
+                    printf("%zu, ", v.kind.shape[i]);                          \
+            }                                                                  \
+        }                                                                      \
+        printf(" }\n");                                                        \
+        printf("\tdata = {\n");                                                \
+        {                                                                      \
+            for (size_t i = 0; i < ARR_LEN(v##_tensor_shape); ++i) {           \
+                printf("\t\t[\n");                                             \
+                for (size_t j = 0; j < v##_tensor_shape[i]; ++j) {             \
+                    printf("\t\t\t%f ", v.kind.data[j]);                       \
+                }                                                              \
+                printf("\n\t\t]\n");                                           \
+            }                                                                  \
+        }                                                                      \
+        printf(" }\n");                                                        \
+    }                                                                          \
+    printf("}\n\n");

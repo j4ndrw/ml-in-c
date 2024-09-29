@@ -1,4 +1,5 @@
 #include "variable.h"
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,6 +112,8 @@ void variable_backward(Variable *root) {
         root->left->grad = left_grad;
         root->right->grad = right_grad;
     } break;
+    default:
+        break;
     }
 
     variable_backward(root->left);

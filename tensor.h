@@ -1,13 +1,14 @@
+#include "utils.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "utils.h"
 
 typedef struct {
     float *data;
     size_t length;
     size_t capacity;
+    size_t *shape;
 } Tensor;
 
 // Credit: https://github.com/tsoding/panim/blob/main/src/nob.h
@@ -25,6 +26,16 @@ typedef struct {
         (tensor)->data[(tensor)->length++] = (item);                           \
     } while (0)
 
-Tensor tensor_new(float *data);
+#define tensor_new(NAME, LENGTH, ...)                                          \
+    Tensor NAME##_tensor = {0};                                                \
+    float NAME##_data[] = __VA_ARGS__;                                         \
+                                                                               \
+    NAME##_tensor.data = NAME##_data;                                          \
+    NAME##_tensor.length = LENGTH;
+
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);
+
+#define tensor_view(tensor, shape) _tensor_view(tensor, shape, ARR_LEN(shape))
+Tensor* _tensor_view(Tensor *tensor, size_t shape[], size_t shape_size);
+

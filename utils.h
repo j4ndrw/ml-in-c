@@ -1,1 +1,2 @@
-#define ARR_LEN(arr) ((int)sizeof(arr) / (int)sizeof((arr)[0]))
+#define ARR_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
+
