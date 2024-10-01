@@ -31,27 +31,24 @@ Tensor chain_rule_div(Variable *variable);
 
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
-        size_t v##_tensor_shape[] = __VA_ARGS__;                               \
-        size_t v##_shape_len = ARR_LEN(v##_tensor_shape);                      \
-        assert(v##_shape_len &&                                                \
-               "Please specify the shape of the tensor view!");                \
-        tensor_view(&v.kind, v##_tensor_shape);                                \
+        tensor_view(&v.kind, __VA_ARGS__);                                \
         printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
             printf("\tshape = { ");                                            \
             {                                                                  \
-                for (size_t i = 0; i < v##_shape_len; ++i) {                   \
-                    if (i == v##_shape_len - 1)                                \
-                        printf("%zu", v.kind.shape[i]);                        \
+                for (size_t i = 0; i < v.kind.shape.length; ++i) {             \
+                    if (i == v.kind.shape.length - 1)                          \
+                        printf("%zu", v.kind.shape.data[i]);                   \
                     else                                                       \
-                        printf("%zu, ", v.kind.shape[i]);                      \
+                        printf("%zu, ", v.kind.shape.data[i]);                 \
                 }                                                              \
             }                                                                  \
             printf(" }\n");                                                    \
             printf("\tdata = {\n");                                            \
             {                                                                  \
-                int *v##_indices = (int *)malloc(v##_shape_len * sizeof(int)); \
-                tensor_print(&v.kind, v##_shape_len, v##_indices, 0, "\t\t");  \
+                int *v##_indices =                                             \
+                    (int *)malloc(v.kind.shape.length * sizeof(int));          \
+                tensor_print(&v.kind, v##_indices, 0, "\t\t");                 \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \

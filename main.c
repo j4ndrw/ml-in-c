@@ -6,9 +6,29 @@
 #include "optimizer.h"
 #include "variable.h"
 
-int main() {
-    srand(time(NULL));
+void multidim_dot_product_test() {
+    var_rand(a, {1, 2, 3});
+    var_rand(b, {1, 3, 4});
+    var_expr(dot, op(&a, @, &b));
+    var_from(result, forward(&dot));
+    var_print(a, items, {});
+    var_print(b, items, {});
+    var_print(result, items, {1, 2, 4});
+}
 
+void dot_product_test() {
+    var_new(a, {1, 2, 3, 4});
+    var_new(id, {1, 1, 1, 1});
+
+    tensor_view(&a.items, {2, 2});
+    tensor_view(&id.items, {2, 2});
+
+    var_expr(dot, op(&a, @, &id));
+    var_from(result, forward(&dot));
+    var_print(result, items, {2, 2});
+}
+
+void simple_backprop_test() {
     var_rand(a, {2, 2});
     var_rand(b, {2, 2});
     var_expr(c, op(&a, *, &b));
@@ -45,5 +65,10 @@ int main() {
     var_print(a, grad, {2, 2});
     var_print(b, items, {2, 2});
     var_print(b, grad, {2, 2});
+}
+
+int main() {
+    srand(time(NULL));
+    multidim_dot_product_test();
     return 0;
 }

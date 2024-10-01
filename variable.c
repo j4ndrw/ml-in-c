@@ -72,43 +72,27 @@ Tensor variable_forward(Variable *root) {
         return root->items;
     }
 
-    assert(root->left->items.length == root->right->items.length &&
-           "Cannot perform op - Items have to have the same length");
-
     size_t length = root->left->items.length;
     Tensor result = tensor_zeros(length);
 
     if (root->op == OP_ADD) {
-        for (size_t i = 0; i < length; ++i) {
-            result.data[i] =
-                root->left->items.data[i] + root->right->items.data[i];
-        }
-        return result;
+        return tensor_add(&root->left->items, &root->right->items);
     }
 
     if (root->op == OP_SUB) {
-        for (size_t i = 0; i < length; ++i) {
-            result.data[i] =
-                root->left->items.data[i] - root->right->items.data[i];
-        }
-        return result;
-    }
+        return tensor_sub(&root->left->items, &root->right->items);
+   }
 
     if (root->op == OP_MUL) {
-        for (size_t i = 0; i < length; ++i) {
-            result.data[i] =
-                root->left->items.data[i] * root->right->items.data[i];
-        }
-        return result;
-    }
+        return tensor_mul(&root->left->items, &root->right->items);
+   }
 
     if (root->op == OP_DIV) {
-        for (size_t i = 0; i < length; ++i) {
-            assert (root->left->items.data[i])
-            result.data[i] =
-                root->left->items.data[i] / root->right->items.data[i];
-        }
-        return result;
+        return tensor_div(&root->left->items, &root->right->items);
+    }
+
+    if (root->op == OP_DOT) {
+        return tensor_dot(&root->left->items, &root->right->items);
     }
 
     return result;
