@@ -7,7 +7,7 @@
 
 #include "tensor.h"
 
-typedef enum { OP_LEAF, OP_ADD, OP_MUL } Op;
+typedef enum { OP_LEAF, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_DOT } Op;
 
 typedef struct Variable {
     struct Variable *left;

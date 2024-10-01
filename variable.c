@@ -23,19 +23,27 @@ Variable variable_op(struct Variable *left, ...) {
     char *op_str = va_arg(args, char *);
     struct Variable *right = va_arg(args, struct Variable *);
 
-    if (strcmp(op_str, "+") != 0 && strcmp(op_str, "*") != 0) {
-        fprintf(
-            stderr,
-            "Invalid op character. Expected one of {'+', '*'}, but found %s\n",
-            op_str);
+    if (strcmp(op_str, "+") != 0 && strcmp(op_str, "-") != 0 &&
+        strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0 &&
+        strcmp(op_str, "@") != 0) {
+        fprintf(stderr,
+                "Invalid op character. Expected one of {'+', '-', '*', '/', "
+                "'@'}, but found %s\n",
+                op_str);
         exit(EXIT_FAILURE);
     }
 
     Op op;
     if (strcmp(op_str, "+") == 0)
         op = OP_ADD;
+    else if (strcmp(op_str, "-") == 0)
+        op = OP_SUB;
     else if (strcmp(op_str, "*") == 0)
         op = OP_MUL;
+    else if (strcmp(op_str, "/") == 0)
+        op = OP_DIV;
+    else if (strcmp(op_str, "@") == 0)
+        op = OP_DOT;
     else
         op = OP_LEAF;
 
@@ -78,10 +86,27 @@ Tensor variable_forward(Variable *root) {
         return result;
     }
 
+    if (root->op == OP_SUB) {
+        for (size_t i = 0; i < length; ++i) {
+            result.data[i] =
+                root->left->items.data[i] - root->right->items.data[i];
+        }
+        return result;
+    }
+
     if (root->op == OP_MUL) {
         for (size_t i = 0; i < length; ++i) {
             result.data[i] =
                 root->left->items.data[i] * root->right->items.data[i];
+        }
+        return result;
+    }
+
+    if (root->op == OP_DIV) {
+        for (size_t i = 0; i < length; ++i) {
+            assert (root->left->items.data[i])
+            result.data[i] =
+                root->left->items.data[i] / root->right->items.data[i];
         }
         return result;
     }
