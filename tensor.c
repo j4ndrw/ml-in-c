@@ -185,7 +185,7 @@ Tensor tensor_scalar_accumulate(Tensor *a, Tensor *b) {
     size_t length = a->length;
     Tensor result = tensor_zeros(1);
     for (size_t i = 0; i < length; ++i) {
-        result.data[0] = a->data[0] + b->data[i];
+        result.data[0] += a->data[0] + b->data[i];
     }
     return result;
 }

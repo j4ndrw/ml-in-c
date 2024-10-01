@@ -64,6 +64,32 @@ Tensor chain_rule_div_denominator(Variable *left, Variable *right);
         printf("}\n\n");                                                       \
     } while (0)
 
+#define var_print_ptr(v, kind, ...)                                                \
+    do {                                                                       \
+        tensor_view(&v->kind, __VA_ARGS__);                                     \
+        printf("%s.%s = {\n", #v, #kind);                                      \
+        {                                                                      \
+            printf("\tshape = { ");                                            \
+            {                                                                  \
+                for (size_t i = 0; i < v->kind.shape.length; ++i) {             \
+                    if (i == v->kind.shape.length - 1)                          \
+                        printf("%zu", v->kind.shape.data[i]);                   \
+                    else                                                       \
+                        printf("%zu, ", v->kind.shape.data[i]);                 \
+                }                                                              \
+            }                                                                  \
+            printf(" }\n");                                                    \
+            printf("\tdata = {\n");                                            \
+            {                                                                  \
+                int *v##_indices =                                             \
+                    (int *)malloc(v->kind.shape.length * sizeof(int));          \
+                tensor_print(&v->kind, v##_indices, 0, "\t\t");                 \
+            }                                                                  \
+            printf("\n\t}\n");                                                 \
+        }                                                                      \
+        printf("}\n\n");                                                       \
+    } while (0)
+
 #define var_new(NAME, ...)                                                     \
     float NAME##_var_tensor_data[] = __VA_ARGS__;                              \
     tensor_new(NAME, ARR_LEN(NAME##_var_tensor_data), __VA_ARGS__);            \

@@ -25,7 +25,7 @@ Variable variable_op(struct Variable *left, ...) {
 
     if (strcmp(op_str, "+") != 0 && strcmp(op_str, "-") != 0 &&
         strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0 &&
-        strcmp(op_str, "@") != 0 && strcmp(op_str, "acc+") != 0) {
+        strcmp(op_str, "@") != 0 && strcmp(op_str, "<+>") != 0) {
         fprintf(stderr,
                 "Invalid op character. Expected one of {'+', '-', '*', '/', "
                 "'@'}, but found %s\n",
@@ -44,8 +44,8 @@ Variable variable_op(struct Variable *left, ...) {
         op = OP_DIV;
     else if (strcmp(op_str, "@") == 0)
         op = OP_DOT;
-    else if (strcmp(op_str, "acc+") == 0)
-        op = OP_DOT;
+    else if (strcmp(op_str, "<+>") == 0)
+        op = OP_ACCUM_SUM;
     else
         op = OP_LEAF;
 
@@ -137,7 +137,7 @@ Tensor variable_forward(Variable *root) {
         return tensor_scalar_accumulate(&left, &right);
     }
 
-    return tensor_zeros(root->items.length);
+    return root->items;
 }
 
 void variable_backward(Variable *root) {
