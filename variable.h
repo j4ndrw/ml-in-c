@@ -7,7 +7,15 @@
 
 #include "tensor.h"
 
-typedef enum { OP_LEAF, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_DOT } Op;
+typedef enum {
+    OP_LEAF,
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_DOT,
+    OP_ACCUM_SUM,
+} Op;
 
 typedef struct Variable {
     struct Variable *left;
@@ -27,11 +35,12 @@ Tensor variable_forward(Variable *root);
 void variable_backward(Variable *root);
 
 Tensor chain_rule_mul(Variable *variable);
-Tensor chain_rule_div(Variable *variable);
+Tensor chain_rule_div_numerator(Variable *variable);
+Tensor chain_rule_div_denominator(Variable *left, Variable *right);
 
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
-        tensor_view(&v.kind, __VA_ARGS__);                                \
+        tensor_view(&v.kind, __VA_ARGS__);                                     \
         printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
             printf("\tshape = { ");                                            \

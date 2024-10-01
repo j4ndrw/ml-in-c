@@ -6,6 +6,16 @@
 #include "optimizer.h"
 #include "variable.h"
 
+void div_gradient_test() {
+    var_new(a, {8});
+    var_new(b, {2});
+    var_expr(div, op(&a, /, &b));
+    var_from(fwd, forward(&div));
+    backward(&div);
+    var_print(a, grad, {});
+    var_print(b, grad, {});
+}
+
 void multidim_dot_product_test() {
     var_rand(a, {1, 2, 3});
     var_rand(b, {1, 3, 4});
@@ -69,6 +79,6 @@ void simple_backprop_test() {
 
 int main() {
     srand(time(NULL));
-    multidim_dot_product_test();
+    div_gradient_test();
     return 0;
 }
