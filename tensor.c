@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #include "tensor.h"
 #include "utils.h"
 
@@ -34,7 +36,17 @@ void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_len) {
         return;
     assert(reduced_dim == tensor->length &&
            "Could not view tensor with given shape");
-    tensor->shape = realloc(tensor->shape, shape_len * sizeof(shape[0]));
+
+    bool already_allocated = true;
+    for (int i = 0; i < shape_len; ++i) {
+        if (tensor->shape[i] == 0) {
+            already_allocated = false;
+            break;
+        }
+    }
+    if (!already_allocated) {
+        tensor->shape = realloc(tensor->shape, shape_len * sizeof(shape[0]));
+    }
     tensor->shape = shape;
 }
 
@@ -88,7 +100,7 @@ Tensor _tensor_rand(size_t shape[], size_t shape_len) {
     assert(length && "Cannot initialize a zero or negative-shaped tensor!");
     Tensor rand_tensor = tensor_zeros(length);
     for (size_t i = 0; i < length; ++i) {
-        rand_tensor.data[i] = randf() / 2.0f;
+        rand_tensor.data[i] = randf();
     }
     _tensor_view(&rand_tensor, shape, shape_len);
     return rand_tensor;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -28,39 +30,42 @@ Tensor chain_rule_mul(Variable *variable);
 Tensor chain_rule_div(Variable *variable);
 
 #define var_print(v, kind, ...)                                                \
-    size_t v##_tensor_shape[] = __VA_ARGS__;                                 \
-    size_t shape_len = ARR_LEN(v##_tensor_shape);                              \
-    assert(shape_len && "Please specify the shape of the tensor view!");   \
-    tensor_view(&v.kind, v##_tensor_shape);                                    \
-    printf("%s.%s = {\n", #v, #kind);                                          \
-    {                                                                          \
-        printf("\tshape = { ");                                                \
+    do {                                                                       \
+        size_t v##_tensor_shape[] = __VA_ARGS__;                               \
+        size_t v##_shape_len = ARR_LEN(v##_tensor_shape);                      \
+        assert(v##_shape_len &&                                                \
+               "Please specify the shape of the tensor view!");                \
+        tensor_view(&v.kind, v##_tensor_shape);                                \
+        printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
-            for (size_t i = 0; i < shape_len; ++i) {                           \
-                if (i == shape_len - 1)                                        \
-                    printf("%zu", v.kind.shape[i]);                            \
-                else                                                           \
-                    printf("%zu, ", v.kind.shape[i]);                          \
+            printf("\tshape = { ");                                            \
+            {                                                                  \
+                for (size_t i = 0; i < v##_shape_len; ++i) {                   \
+                    if (i == v##_shape_len - 1)                                \
+                        printf("%zu", v.kind.shape[i]);                        \
+                    else                                                       \
+                        printf("%zu, ", v.kind.shape[i]);                      \
+                }                                                              \
             }                                                                  \
+            printf(" }\n");                                                    \
+            printf("\tdata = {\n");                                            \
+            {                                                                  \
+                int *v##_indices = (int *)malloc(v##_shape_len * sizeof(int)); \
+                tensor_print(&v.kind, v##_shape_len, v##_indices, 0, "\t\t");  \
+            }                                                                  \
+            printf("\n\t}\n");                                                 \
         }                                                                      \
-        printf(" }\n");                                                        \
-        printf("\tdata = {\n");                                                \
-        {                                                                      \
-            int *indices = (int *)malloc(shape_len * sizeof(int));             \
-            tensor_print(&v.kind, shape_len, indices, 0, "\t\t");              \
-        }                                                                      \
-        printf("\n\t}\n");                                                     \
-    }                                                                          \
-    printf("}\n\n");
+        printf("}\n\n");                                                       \
+    } while (0)
 
-#define var_new(NAME, LENGTH, ...)                                             \
-    tensor_new(NAME, LENGTH, __VA_ARGS__);                                     \
+#define var_new(NAME, ...)                                                     \
+    float NAME##_var_tensor_data[] = __VA_ARGS__;                              \
+    tensor_new(NAME, ARR_LEN(NAME##_var_tensor_data), __VA_ARGS__);            \
     Variable NAME = variable_new(NAME##_tensor);
-#define var_from(NAME, LENGTH, __VA_ARGS__)                                    \
-    Variable NAME = variable_new(__VA_ARGS__);
+#define var_from(NAME, ...) Variable NAME = variable_new(__VA_ARGS__);
 Variable variable_new(Tensor tensor);
 
 #define var_expr(name, value) Variable name = (value)
-#define var_rand(NAME, LENGTH, ...)                                            \
+#define var_rand(NAME, ...)                                                    \
     tensor_rand(NAME, __VA_ARGS__);                                            \
-    var_from(NAME, LENGTH, NAME##_rand_tensor)
+    var_from(NAME, NAME##_rand_tensor)

@@ -18,8 +18,8 @@ Variable variable_new(Tensor tensor) {
 
 Variable variable_op(struct Variable *left, ...) {
     va_list args;
-    size_t argc = 2;
-    va_start(args, argc);
+    va_start(args, left);
+
     char *op_str = va_arg(args, char *);
     struct Variable *right = va_arg(args, struct Variable *);
 

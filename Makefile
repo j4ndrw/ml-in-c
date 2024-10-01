@@ -1,2 +1,5 @@
-main: main.c tensor.c variable.c
-	mkdir -p .build && cc -ggdb -o main main.c tensor.c variable.c utils.c && mv main .build
+main: main.c
+	mkdir -p .build
+	chmod +x ./build.sh
+	./build.sh
+	mv main .build
