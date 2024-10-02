@@ -183,7 +183,7 @@ Tensor tensor_dot(Tensor *a, Tensor *b) {
 }
 
 Tensor tensor_scalar_accumulate(Tensor *accumulator, Tensor *t) {
-    size_t length = accumulator->length;
+    size_t length = t->length;
     Tensor result = tensor_zeros(1);
     for (size_t i = 0; i < length; ++i) {
         result.data[0] += accumulator->data[0] + t->data[i];
