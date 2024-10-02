@@ -62,31 +62,31 @@ Variable variable_op(Variable *left, ...) {
     return variable;
 }
 
-Tensor chain_rule_mul(Variable *variable) {
-    Tensor result = tensor_zeros(variable->grad.length);
-    for (int i = 0; i < variable->grad.length; ++i) {
-        result.data[i] = variable->items.data[i] * variable->grad.data[i];
+Tensor chain_rule_mul(Variable variable) {
+    Tensor result = tensor_zeros(variable.grad.length);
+    for (int i = 0; i < variable.grad.length; ++i) {
+        result.data[i] = variable.items.data[i] * variable.grad.data[i];
     }
     return result;
 }
 
-Tensor chain_rule_div_numerator(Variable *variable) {
-    Tensor result = tensor_zeros(variable->grad.length);
-    for (int i = 0; i < variable->grad.length; ++i) {
-        result.data[i] = 1 / variable->items.data[i];
+Tensor chain_rule_div_numerator(Variable variable) {
+    Tensor result = tensor_zeros(variable.grad.length);
+    for (int i = 0; i < variable.grad.length; ++i) {
+        result.data[i] = 1 / variable.items.data[i];
     }
     return result;
 }
 
-Tensor chain_rule_div_denominator(Variable *left, Variable *right) {
-    assert(left->grad.length == right->grad.length &&
+Tensor chain_rule_div_denominator(Variable left, Variable right) {
+    assert(left.grad.length == right.grad.length &&
            "Tensor gradients must be of same length");
-    size_t n = left->grad.length;
+    size_t n = left.grad.length;
     Tensor result = tensor_zeros(n);
     for (int i = 0; i < n; ++i) {
-        float u = left->items.data[i];
-        float v = right->items.data[i];
-        result.data[i] = (-u * left->grad.data[i]) / (v * v);
+        float u = left.items.data[i];
+        float v = right.items.data[i];
+        result.data[i] = (-u * left.grad.data[i]) / (v * v);
     }
     return result;
 }
@@ -102,6 +102,7 @@ Tensor variable_forward(Variable *root, Graph *visited) {
 
     if (graph_is_visited(visited, root))
         return root->items;
+    graph_mark_visited(visited, root);
 
     if (root->op == OP_LEAF || root->left == NULL) {
         return root->items;
@@ -110,22 +111,27 @@ Tensor variable_forward(Variable *root, Graph *visited) {
 #ifndef __fwd_case
 #define __fwd_case(operator, func)                                             \
     if (root->op == (operator)) {                                              \
-        Variable left_var = *root->left;                                       \
-        Variable right_var = *root->right;                                     \
-                                                                               \
-        graph_mark_visited(visited, root->left);                               \
-        graph_mark_visited(visited, root->right);                              \
-                                                                               \
-        Tensor left = variable_forward(&left_var, visited);                    \
-        Tensor right = variable_forward(&right_var, visited);                  \
-        return (func)(&left, &right);                                          \
+        Tensor left = variable_forward(root->left, visited);                   \
+        Tensor right = variable_forward(root->right, visited);                 \
+        return (func)(left, right);                                            \
     }
 #endif // __fwd_case
+
+    if (root->items.shape.length > 1)
+        tensor_reset_shape(&root->items);
 
     __fwd_case(OP_ADD, tensor_add);
     __fwd_case(OP_SUB, tensor_sub);
     __fwd_case(OP_MUL, tensor_mul);
-    __fwd_case(OP_DIV, tensor_div);
+    if (root->op == (OP_DIV)) {
+        Tensor lt = root->left->items;
+        Tensor rt = root->right->items;
+        tensor_print(lt, {});
+        tensor_print(rt, {});
+        Tensor left = variable_forward(root->left, visited);
+        Tensor right = variable_forward(root->right, visited);
+        return (tensor_div)(left, right);
+    };
     __fwd_case(OP_DOT, tensor_dot);
     __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
 
@@ -158,14 +164,15 @@ void variable_backward(Variable *root, Graph *visited) {
     } break;
     case OP_DOT:
     case OP_MUL: {
-        Tensor left_grad = chain_rule_mul(root->right);
-        Tensor right_grad = chain_rule_mul(root->left);
+        Tensor left_grad = chain_rule_mul(*root->right);
+        Tensor right_grad = chain_rule_mul(*root->left);
         root->left->grad = left_grad;
         root->right->grad = right_grad;
     } break;
     case OP_DIV: {
-        Tensor left_grad = chain_rule_div_numerator(root->right);
-        Tensor right_grad = chain_rule_div_denominator(root->left, root->right);
+        Tensor left_grad = chain_rule_div_numerator(*root->right);
+        Tensor right_grad =
+            chain_rule_div_denominator(*root->left, *root->right);
         root->left->grad = left_grad;
         root->right->grad = right_grad;
     } break;

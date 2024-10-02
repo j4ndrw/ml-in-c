@@ -1,3 +1,5 @@
+// c is hard bro...
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -70,11 +72,14 @@ void multidim_dot_product_test() {
 }
 
 void dot_product_test() {
-    var_new(a, {1, 2, 3, 4});
-    var_new(id, {1, 1, 1, 1});
+    tensor_new(a, 4, {1, 2, 3, 4});
+    tensor_new(id, 4, {1, 1, 1, 1});
 
-    tensor_view(&a.items, {2, 2});
-    tensor_view(&id.items, {2, 2});
+    tensor_view(a_tensor, {2, 2});
+    tensor_view(id_tensor, {2, 2});
+
+    var_from(a, a_tensor);
+    var_from(id, id_tensor);
 
     var_expr(dot, op(&a, @, &id));
     var_from(result, forward(&dot));

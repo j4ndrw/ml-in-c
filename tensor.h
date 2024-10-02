@@ -36,30 +36,33 @@ Tensor tensor_ones(size_t length);
 Tensor _tensor_rand(size_t shape[], size_t shape_len);
 
 #define tensor_view(tensor, ...)                                               \
+    Tensor tensor##_view;                                                      \
     do {                                                                       \
         size_t shape[] = __VA_ARGS__;                                          \
-        __tensor_view(tensor, shape);                                          \
+        tensor##_view = __tensor_view(tensor, shape);                          \
     } while (0)
 #define __tensor_view(tensor, shape) _tensor_view(tensor, shape, ARR_LEN(shape))
-void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_len);
+Tensor _tensor_view(Tensor tensor, size_t shape[], size_t shape_len);
 
 #define tensor_print_ptr(t, ...)                                               \
     do {                                                                       \
-        Tensor t##_ptr = *t;                                                      \
-        tensor_print(t##_ptr, __VA_ARGS__);                                                    \
+        Tensor t##_ptr = *t;                                                   \
+        tensor_print(t##_ptr, __VA_ARGS__);                                    \
     } while (0)
 #define tensor_print(t, ...)                                                   \
     do {                                                                       \
         var_from(t##_tensor, t);                                               \
         var_print(t##_tensor, items, __VA_ARGS__);                             \
     } while (0)
-void __tensor_print(Tensor *tensor, int *indices, int depth, char *prefix);
+void __tensor_print(Tensor tensor, int *indices, int depth, char *prefix);
 
-Tensor tensor_add(Tensor *a, Tensor *b);
-Tensor tensor_sub(Tensor *a, Tensor *b);
-Tensor tensor_mul(Tensor *a, Tensor *b);
-Tensor tensor_div(Tensor *a, Tensor *b);
-Tensor tensor_dot(Tensor *a, Tensor *b);
-Tensor tensor_scalar_accumulate(Tensor *accumulator, Tensor *t);
+Tensor tensor_add(Tensor a, Tensor b);
+Tensor tensor_sub(Tensor a, Tensor b);
+Tensor tensor_mul(Tensor a, Tensor b);
+Tensor tensor_div(Tensor a, Tensor b);
+Tensor tensor_dot(Tensor a, Tensor b);
+Tensor tensor_scalar_accumulate(Tensor accumulator, Tensor t);
 
 Tensor tensor_new_scalar(float value);
+
+void tensor_reset_shape(Tensor *t);

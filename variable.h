@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "tensor.h"
 #include "graph.h"
+#include "tensor.h"
 
 typedef enum {
     OP_LEAF,
@@ -35,30 +35,32 @@ Tensor variable_forward(Variable *root, Graph *visited);
 #define backward(x) variable_backward((x), NULL)
 void variable_backward(Variable *root, Graph *visited);
 
-Tensor chain_rule_mul(Variable *variable);
-Tensor chain_rule_div_numerator(Variable *variable);
-Tensor chain_rule_div_denominator(Variable *left, Variable *right);
+Tensor chain_rule_mul(Variable variable);
+Tensor chain_rule_div_numerator(Variable variable);
+Tensor chain_rule_div_denominator(Variable left, Variable right);
 
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
-        tensor_view(&v.kind, __VA_ARGS__);                                     \
+        Tensor v##_kind = v.kind;                                              \
+        tensor_view(v##_kind, __VA_ARGS__);                                    \
+        Tensor v##_view = v##_kind_view;                                       \
         printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
             printf("\tshape = { ");                                            \
             {                                                                  \
-                for (size_t i = 0; i < v.kind.shape.length; ++i) {             \
-                    if (i == v.kind.shape.length - 1)                          \
-                        printf("%zu", v.kind.shape.data[i]);                   \
+                for (size_t i = 0; i < v##_view.shape.length; ++i) {      \
+                    if (i == v##_view.shape.length - 1)                   \
+                        printf("%zu", v##_view.shape.data[i]);          \
                     else                                                       \
-                        printf("%zu, ", v.kind.shape.data[i]);                 \
+                        printf("%zu, ", v##_view.shape.data[i]);        \
                 }                                                              \
             }                                                                  \
             printf(" }\n");                                                    \
             printf("\tdata = {\n");                                            \
             {                                                                  \
                 int *v##_indices =                                             \
-                    (int *)malloc(v.kind.shape.length * sizeof(int));          \
-                __tensor_print(&v.kind, v##_indices, 0, "\t\t");                 \
+                    (int *)malloc(v##_view.shape.length * sizeof(int));   \
+                __tensor_print(v##_view, v##_indices, 0, "\t\t");         \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \
