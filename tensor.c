@@ -27,7 +27,8 @@ Tensor tensor_ones(size_t length) {
 }
 
 void _tensor_view(Tensor *tensor, size_t shape[], size_t shape_len) {
-    if (shape_len == 0) return;
+    if (shape_len == 0)
+        return;
     size_t reduced_dim = 0;
     for (size_t i = 0; i < shape_len; ++i) {
         if (reduced_dim == 0)
@@ -181,11 +182,11 @@ Tensor tensor_dot(Tensor *a, Tensor *b) {
     return result;
 }
 
-Tensor tensor_scalar_accumulate(Tensor *a, Tensor *b) {
-    size_t length = a->length;
+Tensor tensor_scalar_accumulate(Tensor *accumulator, Tensor *t) {
+    size_t length = accumulator->length;
     Tensor result = tensor_zeros(1);
     for (size_t i = 0; i < length; ++i) {
-        result.data[0] += a->data[0] + b->data[i];
+        result.data[0] += accumulator->data[0] + t->data[i];
     }
     return result;
 }

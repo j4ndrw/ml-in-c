@@ -50,4 +50,4 @@ Tensor tensor_sub(Tensor *a, Tensor *b);
 Tensor tensor_mul(Tensor *a, Tensor *b);
 Tensor tensor_div(Tensor *a, Tensor *b);
 Tensor tensor_dot(Tensor *a, Tensor *b);
-Tensor tensor_scalar_accumulate(Tensor *a, Tensor *b);
+Tensor tensor_scalar_accumulate(Tensor *accumulator, Tensor *t);
