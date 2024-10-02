@@ -29,8 +29,9 @@ Tensor tensor_ones(size_t length) {
 }
 
 Tensor _tensor_view(Tensor tensor, size_t shape[], size_t shape_len) {
-    if (shape_len == 0)
+    if (shape_len == 0) {
         return tensor;
+    }
     size_t reduced_dim = 0;
     for (size_t i = 0; i < shape_len; ++i) {
         if (reduced_dim == 0)

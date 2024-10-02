@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "graph.h"
 #include "tensor.h"
 
 typedef enum {
@@ -29,11 +28,8 @@ typedef struct Variable {
 #define op(left, op, right) variable_op((left), (#op), (right))
 Variable variable_op(struct Variable *left, ...);
 
-#define forward(x) variable_forward((x), NULL)
-Tensor variable_forward(Variable *root, Graph *visited);
-
-#define backward(x) variable_backward((x), NULL)
-void variable_backward(Variable *root, Graph *visited);
+#define backward(x) variable_backward((x))
+void variable_backward(Variable *root);
 
 Tensor chain_rule_mul(Variable variable);
 Tensor chain_rule_div_numerator(Variable variable);

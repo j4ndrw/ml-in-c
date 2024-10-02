@@ -18,13 +18,17 @@ typedef struct {
 } Tensor;
 
 #define tensor_new(NAME, LENGTH, ...)                                          \
-    Tensor NAME##_tensor = {0};                                                \
+    Tensor NAME##_tensor;                                                      \
     float NAME##_data[] = __VA_ARGS__;                                         \
                                                                                \
-    NAME##_tensor.data = NAME##_data;                                          \
+    NAME##_tensor.data = (float *)malloc(LENGTH * sizeof(float));              \
+    for (size_t i = 0; i < LENGTH; ++i) {                                      \
+        NAME##_tensor.data[i] = NAME##_data[i];                                \
+    }                                                                          \
     NAME##_tensor.length = LENGTH;                                             \
     NAME##_tensor.shape.data = (size_t *)malloc(sizeof(size_t));               \
-    NAME##_tensor.shape.length = 1;
+    NAME##_tensor.shape.length = 1;                                            \
+    NAME##_tensor.shape.data[0] = LENGTH;
 
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);

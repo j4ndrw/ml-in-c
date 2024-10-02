@@ -10,11 +10,10 @@
 #include "variable.h"
 
 void mse_test() {
-    var_new(a, {5});
-    var_new(b, {12});
-    Variable loss = loss_mse(&a, &b);
-    Tensor result = forward(&loss);
-    tensor_print(result, {});
+    var_new(a, {44});
+    var_new(b, {99});
+    Variable loss = loss_mse(a, b);
+    var_print(loss, items, {});
 }
 
 void simple_neuron_test() {
@@ -36,12 +35,10 @@ void simple_neuron_test() {
             var_from(expected, expected_tensor);
 
             var_from(sample, sample_tensor);
-            var_expr(model, op(&sample, *, &weights));
+            var_expr(prediction, op(&sample, *, &weights));
 
-            var_from(prediction, forward(&model));
-            Variable loss = loss_mse(&prediction, &expected);
-            Tensor loss_tensor = forward(&loss);
-            total_loss += loss_tensor.data[0];
+            Variable loss = loss_mse(prediction, expected);
+            total_loss += loss.items.data[0];
 
             backward(&loss);
         }
@@ -55,7 +52,6 @@ void div_gradient_test() {
     var_new(a, {8});
     var_new(b, {2});
     var_expr(div, op(&a, /, &b));
-    var_from(fwd, forward(&div));
     backward(&div);
     var_print(a, grad, {});
     var_print(b, grad, {});
@@ -65,10 +61,9 @@ void multidim_dot_product_test() {
     var_rand(a, {1, 2, 3});
     var_rand(b, {1, 3, 4});
     var_expr(dot, op(&a, @, &b));
-    var_from(result, forward(&dot));
     var_print(a, items, {});
     var_print(b, items, {});
-    var_print(result, items, {1, 2, 4});
+    var_print(dot, items, {1, 2, 4});
 }
 
 void dot_product_test() {
@@ -82,8 +77,7 @@ void dot_product_test() {
     var_from(id, id_tensor);
 
     var_expr(dot, op(&a, @, &id));
-    var_from(result, forward(&dot));
-    var_print(result, items, {2, 2});
+    var_print(dot, items, {2, 2});
 }
 
 void simple_backprop_test() {
@@ -93,8 +87,6 @@ void simple_backprop_test() {
 
     float learning_rate = 0.1;
     SGDOptimizer optimizer = optimizer_sgd_create(&a, &b, learning_rate);
-
-    var_from(result, forward(&c));
 
     printf("BEFORE BACKWARD:\n---------------\n");
     var_print(a, items, {2, 2});
@@ -127,7 +119,8 @@ void simple_backprop_test() {
 
 int main() {
     srand(time(NULL));
-    // simple_neuron_test();
-    mse_test();
+    simple_neuron_test();
+    // mse_test();
+    // div_gradient_test();
     return 0;
 }
