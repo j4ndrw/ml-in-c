@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "tensor.h"
+#include "graph.h"
 
 typedef enum {
     OP_LEAF,
@@ -28,11 +29,11 @@ typedef struct Variable {
 #define op(left, op, right) variable_op((left), (#op), (right))
 Variable variable_op(struct Variable *left, ...);
 
-#define forward(x) variable_forward((x))
-Tensor variable_forward(Variable *root);
+#define forward(x) variable_forward((x), NULL)
+Tensor variable_forward(Variable *root, Graph *visited);
 
-#define backward(x) variable_backward((x))
-void variable_backward(Variable *root);
+#define backward(x) variable_backward((x), NULL)
+void variable_backward(Variable *root, Graph *visited);
 
 Tensor chain_rule_mul(Variable *variable);
 Tensor chain_rule_div_numerator(Variable *variable);
@@ -57,33 +58,33 @@ Tensor chain_rule_div_denominator(Variable *left, Variable *right);
             {                                                                  \
                 int *v##_indices =                                             \
                     (int *)malloc(v.kind.shape.length * sizeof(int));          \
-                tensor_print(&v.kind, v##_indices, 0, "\t\t");                 \
+                __tensor_print(&v.kind, v##_indices, 0, "\t\t");                 \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \
         printf("}\n\n");                                                       \
     } while (0)
 
-#define var_print_ptr(v, kind, ...)                                                \
+#define var_print_ptr(v, kind, ...)                                            \
     do {                                                                       \
-        tensor_view(&v->kind, __VA_ARGS__);                                     \
+        tensor_view(&v->kind, __VA_ARGS__);                                    \
         printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
             printf("\tshape = { ");                                            \
             {                                                                  \
-                for (size_t i = 0; i < v->kind.shape.length; ++i) {             \
-                    if (i == v->kind.shape.length - 1)                          \
-                        printf("%zu", v->kind.shape.data[i]);                   \
+                for (size_t i = 0; i < v->kind.shape.length; ++i) {            \
+                    if (i == v->kind.shape.length - 1)                         \
+                        printf("%zu", v->kind.shape.data[i]);                  \
                     else                                                       \
-                        printf("%zu, ", v->kind.shape.data[i]);                 \
+                        printf("%zu, ", v->kind.shape.data[i]);                \
                 }                                                              \
             }                                                                  \
             printf(" }\n");                                                    \
             printf("\tdata = {\n");                                            \
             {                                                                  \
                 int *v##_indices =                                             \
-                    (int *)malloc(v->kind.shape.length * sizeof(int));          \
-                tensor_print(&v->kind, v##_indices, 0, "\t\t");                 \
+                    (int *)malloc(v->kind.shape.length * sizeof(int));         \
+                tensor_print(&v->kind, v##_indices, 0, "\t\t");                \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \

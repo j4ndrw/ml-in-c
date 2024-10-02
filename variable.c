@@ -1,4 +1,6 @@
 #include "variable.h"
+#include "graph.h"
+#include "tensor.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -16,12 +18,12 @@ Variable variable_new(Tensor tensor) {
     return variable;
 }
 
-Variable variable_op(struct Variable *left, ...) {
+Variable variable_op(Variable *left, ...) {
     va_list args;
     va_start(args, left);
 
     char *op_str = va_arg(args, char *);
-    struct Variable *right = va_arg(args, struct Variable *);
+    Variable *right = va_arg(args, Variable *);
 
     if (strcmp(op_str, "+") != 0 && strcmp(op_str, "-") != 0 &&
         strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0 &&
@@ -49,13 +51,12 @@ Variable variable_op(struct Variable *left, ...) {
     else
         op = OP_LEAF;
 
-    Tensor tensor = tensor_zeros(left->items.length);
-    Variable variable = {0};
+    Variable variable;
     variable.left = left;
     variable.right = right;
     variable.op = op;
-    variable.items = tensor;
-    variable.grad = tensor_ones(tensor.length);
+    variable.items = tensor_zeros(left->items.length);
+    variable.grad = tensor_ones(left->items.length);
 
     va_end(args);
     return variable;
@@ -90,59 +91,63 @@ Tensor chain_rule_div_denominator(Variable *left, Variable *right) {
     return result;
 }
 
-Tensor variable_forward(Variable *root) {
-    if (root->left == NULL) {
+Tensor variable_forward(Variable *root, Graph *visited) {
+    if (!visited) {
+        Graph graph = graph_empty();
+        visited = &graph;
+    }
+
+    if (root == NULL)
+        return tensor_zeros(0);
+
+    if (graph_is_visited(visited, root))
+        return root->items;
+
+    if (root->op == OP_LEAF || root->left == NULL) {
         return root->items;
     }
 
-    if (root->op == OP_ADD) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
-
-        return tensor_add(&left, &right);
+#ifndef __fwd_case
+#define __fwd_case(operator, func)                                             \
+    if (root->op == (operator)) {                                              \
+        Variable left_var = *root->left;                                       \
+        Variable right_var = *root->right;                                     \
+                                                                               \
+        graph_mark_visited(visited, root->left);                               \
+        graph_mark_visited(visited, root->right);                              \
+                                                                               \
+        Tensor left = variable_forward(&left_var, visited);                    \
+        Tensor right = variable_forward(&right_var, visited);                  \
+        return (func)(&left, &right);                                          \
     }
+#endif // __fwd_case
 
-    if (root->op == OP_SUB) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
+    __fwd_case(OP_ADD, tensor_add);
+    __fwd_case(OP_SUB, tensor_sub);
+    __fwd_case(OP_MUL, tensor_mul);
+    __fwd_case(OP_DIV, tensor_div);
+    __fwd_case(OP_DOT, tensor_dot);
+    __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
 
-        return tensor_sub(&left, &right);
-    }
-
-    if (root->op == OP_MUL) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
-
-        return tensor_mul(&left, &right);
-    }
-
-    if (root->op == OP_DIV) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
-
-        return tensor_div(&left, &right);
-    }
-
-    if (root->op == OP_DOT) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
-
-        return tensor_dot(&left, &right);
-    }
-    if (root->op == OP_ACCUM_SUM) {
-        Tensor left = variable_forward(root->left);
-        Tensor right = variable_forward(root->right);
-
-        assert(left.length == 1);
-        return tensor_scalar_accumulate(&left, &right);
-    }
+#ifdef __fwd_case
+#undef __fwd_case
+#endif // __fwd_case
 
     return root->items;
 }
 
-void variable_backward(Variable *root) {
-    if (root->left == NULL)
+void variable_backward(Variable *root, Graph *visited) {
+    if (!visited) {
+        Graph graph = graph_empty();
+        visited = &graph;
+    }
+
+    if (root == NULL || root->left == NULL)
         return;
+
+    if (graph_is_visited(visited, root))
+        return;
+    graph_mark_visited(visited, root);
 
     switch (root->op) {
     case OP_ADD:
@@ -168,6 +173,6 @@ void variable_backward(Variable *root) {
         break;
     }
 
-    variable_backward(root->left);
-    variable_backward(root->right);
+    variable_backward(root->left, visited);
+    variable_backward(root->right, visited);
 }
