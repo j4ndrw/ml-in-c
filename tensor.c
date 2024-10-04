@@ -7,10 +7,8 @@
 #include "utils.h"
 
 Tensor tensor_empty(size_t length) {
-    assert(length > 0 && "Length must be greater than zero");
-
     Tensor tensor;
-    tensor.data = (float *)malloc(length * sizeof(float));
+    tensor.data = (float *)malloc((length > 0 ? length : 1) * sizeof(float));
     assert(tensor.data != NULL && "Memory allocation failed");
 
     tensor.length = length;

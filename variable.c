@@ -65,37 +65,20 @@ Variable variable_op(Variable *left, ...) {
     variable.left = left;
     variable.right = right;
     variable.op = op;
-    variable.grad = tensor_ones(left->items.length);
-
-#ifndef __fwd_case
-#define __fwd_case(operator, func)                                             \
-    if (variable.op == (operator) && variable.left->items.length > 0 &&        \
-        variable.right->items.length > 0) {                                    \
-        variable.items = (func)(variable.left->items, variable.right->items);  \
-        return variable;                                                       \
-    }
-#endif // __fwd_case
+    variable.items = tensor_ones(left->items.length > 0 ? left->items.length
+                                                        : right->items.length);
+    variable.grad = tensor_ones(left->items.length > 0 ? left->items.length
+                                                       : right->items.length);
 
     va_end(args);
-
-    __fwd_case(OP_ADD, tensor_add);
-    __fwd_case(OP_SUB, tensor_sub);
-    __fwd_case(OP_MUL, tensor_mul);
-    __fwd_case(OP_DIV, tensor_div);
-    __fwd_case(OP_DOT, tensor_dot);
-    __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
-    __fwd_case(OP_SCALAR_SUM, tensor_scalar_sum);
-    __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff);
-    __fwd_case(OP_SCALAR_MUL, tensor_scalar_mul);
-    __fwd_case(OP_SCALAR_POW, tensor_scalar_pow);
 
     return variable;
 }
 
-Tensor chain_rule_mul(Variable variable) {
-    Tensor result = tensor_zeros(variable.grad.length);
-    for (int i = 0; i < variable.grad.length; ++i) {
-        result.data[i] = variable.items.data[i] * variable.grad.data[i];
+Tensor chain_rule_mul(Variable partial, Variable term) {
+    Tensor result = tensor_zeros(partial.grad.length);
+    for (int i = 0; i < partial.grad.length; ++i) {
+        result.data[i] = term.items.data[i] * partial.grad.data[i];
     }
     return result;
 }
@@ -109,6 +92,9 @@ Tensor chain_rule_div_numerator(Variable variable) {
 }
 
 Tensor chain_rule_div_denominator(Variable left, Variable right) {
+    if (left.grad.length == 0) left.grad = tensor_ones(right.grad.length);
+    if (right.grad.length == 0) right.grad = tensor_ones(left.grad.length);
+
     assert(left.grad.length == right.grad.length &&
            "Tensor gradients must be of same length");
     size_t n = left.grad.length;
@@ -133,30 +119,56 @@ Tensor chain_rule_base_pow(Variable base, Variable pow) {
                              tensor_natural_log(base.grad));
 }
 
+Variable variable_forward(Variable *root) {
+#define __fwd_case(operator, func)                                             \
+    if (root->op == (operator) && root->left->items.length > 0 &&              \
+        root->right->items.length > 0) {                                       \
+        Variable left = variable_forward(root->left);                          \
+        Variable right = variable_forward(root->right);                        \
+        if (left.items.length == 0 && right.items.length == 0)                 \
+            return variable_new(tensor_zeros(0));                              \
+        if (left.items.length == 0)                                            \
+            return right;                                                      \
+        if (right.items.length == 0)                                           \
+            return left;                                                       \
+        root->items = (func)(left.items, right.items);                         \
+        if (root == NULL)                                                      \
+            return variable_new(tensor_zeros(0));                              \
+        return *root;                                                          \
+    }
+
+    if (root == NULL)
+        return variable_new(tensor_zeros(0));
+    if (root->left == NULL)
+        return *root;
+    if (root->right == NULL)
+        return *root;
+
+    __fwd_case(OP_ADD, tensor_add);
+    __fwd_case(OP_SUB, tensor_sub);
+    __fwd_case(OP_MUL, tensor_mul);
+    __fwd_case(OP_DIV, tensor_div);
+    __fwd_case(OP_DOT, tensor_dot);
+    __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
+    __fwd_case(OP_SCALAR_SUM, tensor_scalar_sum);
+    __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff);
+    __fwd_case(OP_SCALAR_MUL, tensor_scalar_mul);
+    __fwd_case(OP_SCALAR_POW, tensor_scalar_pow);
+
+    return variable_new(tensor_zeros(0));
+
+#undef __fwd_case
+}
+
 void variable_backward(Variable *root) {
     if (root == NULL || root->left == NULL || root->right == NULL) {
         return;
     }
 
-    tensor_reset_shape(&root->left->items);
-    tensor_reset_shape(&root->right->items);
-    tensor_reset_shape(&root->left->grad);
-    tensor_reset_shape(&root->right->grad);
-
-    if (root->left->grad.data == NULL || root->left->items.data == NULL ||
-        root->left->items.length == 0 || root->left->items.shape.length == 0 ||
-        root->left->items.shape.data == NULL) {
-        return;
-    }
-
-    if (root->right->grad.data == NULL || root->right->items.data == NULL ||
-        root->right->items.length == 0 ||
-        root->right->items.shape.length == 0 ||
-        root->right->items.shape.data == NULL) {
-        return;
-    }
-    Variable left = *root->left;
-    Variable right = *root->right;
+    if (root->left->grad.length == 0)
+        root->left->grad = tensor_ones(root->left->items.length);
+    if (root->right->grad.length == 0)
+        root->right->grad = tensor_ones(root->right->items.length);
 
 #define __add_derivative                                                       \
     do {                                                                       \
@@ -170,20 +182,23 @@ void variable_backward(Variable *root) {
     } while (0);
 #define __mul_derivative                                                       \
     do {                                                                       \
-        Tensor left_grad = chain_rule_mul(*root->right);                       \
-        Tensor right_grad = chain_rule_mul(*root->left);                       \
-        root->left->grad = left_grad;                                          \
-        root->right->grad = right_grad;                                        \
+        root->left->grad = chain_rule_mul(*root, *root->right);                \
+        root->right->grad = chain_rule_mul(*root, *root->left);                \
     } while (0);
 #define __div_derivative                                                       \
     do {                                                                       \
-        root->left->grad = chain_rule_div_numerator(right);                    \
-        root->right->grad = chain_rule_div_denominator(left, right);           \
+        Tensor left_grad = chain_rule_div_numerator(*root->right);             \
+        Tensor right_grad =                                                    \
+            chain_rule_div_denominator(*root->left, *root->right);             \
+        root->left->grad = left_grad;                                          \
+        root->right->grad = right_grad;                                        \
     } while (0);
 #define __pow_derivative                                                       \
     do {                                                                       \
-        root->left->grad = chain_rule_pow(left, right);                        \
-        root->right->grad = chain_rule_base_pow(left, right);                  \
+        Tensor left_grad = chain_rule_pow(*root->left, *root->right);          \
+        Tensor right_grad = chain_rule_base_pow(*root->left, *root->right);    \
+        root->left->grad = left_grad;                                          \
+        root->right->grad = right_grad;                                        \
     } while (0);
 
 #define __case(op, fn)                                                         \
