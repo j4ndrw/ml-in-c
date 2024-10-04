@@ -1,31 +1,57 @@
 #include <assert.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include "tensor.h"
 #include "utils.h"
-#include "variable.h"
+
+Tensor tensor_empty(size_t length) {
+    assert(length > 0 && "Length must be greater than zero");
+
+    Tensor tensor;
+    tensor.data = (float *)malloc(length * sizeof(float));
+    assert(tensor.data != NULL && "Memory allocation failed");
+
+    tensor.length = length;
+    tensor.shape.data = (size_t *)malloc(sizeof(size_t));
+    assert(tensor.shape.data != NULL && "Memory allocation failed");
+    tensor.shape.length = 1;
+    tensor.shape.data[0] = length;
+
+    // Initialize all elements to zero
+    for (size_t i = 0; i < length; ++i) {
+        tensor.data[i] = 0.0f; // Set each element to zero
+    }
+
+    return tensor;
+}
 
 Tensor tensor_zeros(size_t length) {
-    tensor_new(zeros, length, {0});
-    zeros_tensor.data = (float *)malloc(length * sizeof(float));
-    zeros_tensor.shape.data[0] = length;
+    Tensor zeros = tensor_empty(length);
 
     for (size_t i = 0; i < length; ++i) {
-        zeros_tensor.data[i] = 0;
+        zeros.data[i] = 0;
     }
-    return zeros_tensor;
+    return zeros;
 }
 
 Tensor tensor_ones(size_t length) {
-    tensor_new(ones, length, {0});
-    ones_tensor.data = (float *)malloc(length * sizeof(float));
-    ones_tensor.shape.data[0] = length;
+    Tensor ones = tensor_empty(length);
 
     for (size_t i = 0; i < length; ++i) {
-        ones_tensor.data[i] = 1;
+        ones.data[i] = 1;
     }
-    return ones_tensor;
+    return ones;
+}
+
+Tensor tensor_from(size_t length, float value) {
+    Tensor from = tensor_empty(length);
+
+    for (size_t i = 0; i < length; ++i) {
+        from.data[i] = value;
+    }
+    return from;
 }
 
 Tensor _tensor_view(Tensor tensor, size_t shape[], size_t shape_len) {
@@ -45,7 +71,8 @@ Tensor _tensor_view(Tensor tensor, size_t shape[], size_t shape_len) {
            "Could not view tensor with given shape");
 
     Tensor new_tensor = tensor_zeros(tensor.length);
-    new_tensor.shape.data = realloc(new_tensor.shape.data, shape_len * sizeof(size_t));
+    new_tensor.shape.data =
+        realloc(new_tensor.shape.data, shape_len * sizeof(size_t));
     new_tensor.shape.length = shape_len;
     for (size_t i = 0; i < shape_len; ++i) {
         new_tensor.shape.data[i] = shape[i];
@@ -184,14 +211,65 @@ Tensor tensor_scalar_accumulate(Tensor accumulator, Tensor t) {
     assert(accumulator.length == 1 && "The accumulator must be a scalar value");
     size_t length = t.length;
     Tensor result = tensor_zeros(1);
+    result.data[0] = accumulator.data[0];
     for (size_t i = 0; i < length; ++i) {
-        result.data[0] += accumulator.data[0] + t.data[i];
+        result.data[0] += t.data[i];
+    }
+    return result;
+}
+
+Tensor tensor_scalar_sum(Tensor t, Tensor scalar) {
+    assert(scalar.length == 1 && "This is not a scalar value");
+    size_t length = t.length;
+    Tensor result = tensor_ones(t.length);
+    for (size_t i = 0; i < length; ++i) {
+        result.data[i] = scalar.data[0] + t.data[i];
+    }
+    return result;
+}
+
+Tensor tensor_scalar_diff(Tensor t, Tensor scalar) {
+    assert(scalar.length == 1 && "This is not a scalar value");
+    size_t length = t.length;
+    Tensor result = tensor_ones(t.length);
+    for (size_t i = 0; i < length; ++i) {
+        result.data[i] = t.data[i] - scalar.data[0];
+    }
+    return result;
+}
+
+Tensor tensor_scalar_mul(Tensor t, Tensor scalar) {
+    assert(scalar.length == 1 && "This is not a scalar value");
+    size_t length = t.length;
+    Tensor result = tensor_ones(t.length);
+    for (size_t i = 0; i < length; ++i) {
+        result.data[i] = scalar.data[0] * t.data[i];
+    }
+    return result;
+}
+
+Tensor tensor_scalar_pow(Tensor base, Tensor pow) {
+    assert(pow.length == 1 && "This is not a scalar value");
+    size_t length = base.length;
+    Tensor result = tensor_ones(base.length);
+    for (size_t i = 0; i < length; ++i) {
+        for (size_t j = 0; j < pow.data[0]; ++j) {
+            result.data[i] *= base.data[i];
+        }
+    }
+    return result;
+}
+
+Tensor tensor_natural_log(Tensor t) {
+    Tensor result = tensor_zeros(t.length);
+    for (size_t i = 0; i < t.length; ++i) {
+        result.data[i] = (float)log((float)t.data[i]);
     }
     return result;
 }
 
 Tensor tensor_new_scalar(float value) {
-    tensor_new(scalar, 1, {1});
+    tensor_new(scalar, 1, {value});
     return scalar_tensor;
 }
 
@@ -199,4 +277,22 @@ void tensor_reset_shape(Tensor *t) {
     t->shape = (Shape){.length = 1, .data = (size_t *)malloc(sizeof(size_t))};
     size_t shape[] = {t->length};
     t->shape.data = shape;
+}
+
+Tensor tensor_copy(Tensor tensor) {
+    Tensor new_tensor = tensor_zeros(tensor.length);
+    for (size_t i = 0; i < tensor.length; ++i) {
+        new_tensor.data[i] = tensor.data[i];
+    }
+    for (size_t i = 0; i < tensor.shape.length; ++i) {
+        new_tensor.shape.data[i] = tensor.shape.data[i];
+    }
+    return new_tensor;
+}
+
+void tensor_free(Tensor tensor) {
+    tensor.length = 0;
+    tensor.shape.length = 0;
+    free(tensor.data);
+    free(tensor.shape.data);
 }

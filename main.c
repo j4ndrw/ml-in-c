@@ -7,12 +7,15 @@
 
 #include "loss.h"
 #include "optimizer.h"
+#include "tensor.h"
 #include "variable.h"
 
 void mse_test() {
     var_new(a, {44});
     var_new(b, {99});
-    Variable loss = loss_mse(a, b);
+    var_print(a, items, {});
+    var_print(b, items, {});
+    Variable loss = loss_mse(&a, &b);
     var_print(loss, items, {});
 }
 
@@ -21,31 +24,28 @@ void simple_neuron_test() {
     var_new(labels, {2, 4, 6, 8, 10, 12});
 
     var_rand(weights, {1});
-    size_t epochs = 100;
-    float learning_rate = 0.0001;
+    size_t epochs = 1000;
+    float learning_rate = 0.01;
     SGDOptimizer optimizer =
         optimizer_sgd_create(&weights, NULL, learning_rate);
 
     for (size_t epoch = 0; epoch < epochs; ++epoch) {
-        float total_loss = 0;
-        for (size_t i = 0; i < inputs.items.length; ++i) {
-            tensor_new(sample, 1, {inputs.items.data[i]});
-            tensor_new(expected, 1, {labels.items.data[i]});
-
-            var_from(expected, expected_tensor);
-
-            var_from(sample, sample_tensor);
-            var_expr(prediction, op(&sample, *, &weights));
-
-            Variable loss = loss_mse(prediction, expected);
-            total_loss += loss.items.data[0];
-
-            backward(&loss);
-        }
-        optimizer_sgd_step(&optimizer);
         optimizer_sgd_zero_grad(&optimizer);
-        printf("EPOCH: %zu | LOSS: %f\n", epoch, total_loss);
+
+        var_expr(prediction, op(&inputs, <*>, &weights));
+        var_expr(loss, loss_mse(&labels, &prediction));
+
+        backward(&loss);
+        optimizer_sgd_step(&optimizer);
+
+        if (epoch % 100 == 0) {
+            var_print(weights, grad, {});
+            printf("EPOCH: %zu | LOSS: %f | WEIGHT: %f\n", epoch,
+                   loss.items.data[0], weights.items.data[0]);
+        }
     }
+
+    var_free(inputs, labels, weights);
 }
 
 void div_gradient_test() {
@@ -121,6 +121,5 @@ int main() {
     srand(time(NULL));
     simple_neuron_test();
     // mse_test();
-    // div_gradient_test();
     return 0;
 }

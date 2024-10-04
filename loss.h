@@ -1,3 +1,3 @@
 #include "variable.h"
 
-Variable loss_mse(Variable a, Variable b);
+Variable loss_mse(Variable *actual, Variable *predicted);

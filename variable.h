@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,6 +16,10 @@ typedef enum {
     OP_DIV,
     OP_DOT,
     OP_ACCUM_SUM,
+    OP_SCALAR_SUM,
+    OP_SCALAR_DIFF,
+    OP_SCALAR_MUL,
+    OP_SCALAR_POW,
 } Op;
 
 typedef struct Variable {
@@ -34,6 +39,8 @@ void variable_backward(Variable *root);
 Tensor chain_rule_mul(Variable variable);
 Tensor chain_rule_div_numerator(Variable variable);
 Tensor chain_rule_div_denominator(Variable left, Variable right);
+Tensor chain_rule_pow(Variable base, Variable pow);
+Tensor chain_rule_base_pow(Variable base, Variable pow);
 
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
@@ -44,19 +51,21 @@ Tensor chain_rule_div_denominator(Variable left, Variable right);
         {                                                                      \
             printf("\tshape = { ");                                            \
             {                                                                  \
-                for (size_t i = 0; i < v##_view.shape.length; ++i) {      \
-                    if (i == v##_view.shape.length - 1)                   \
-                        printf("%zu", v##_view.shape.data[i]);          \
+                for (size_t i = 0; i < v##_view.shape.length; ++i) {           \
+                    if (i == v##_view.shape.length - 1)                        \
+                        printf("%zu", v##_view.shape.data[i]);                 \
                     else                                                       \
-                        printf("%zu, ", v##_view.shape.data[i]);        \
+                        printf("%zu, ", v##_view.shape.data[i]);               \
                 }                                                              \
             }                                                                  \
             printf(" }\n");                                                    \
             printf("\tdata = {\n");                                            \
             {                                                                  \
                 int *v##_indices =                                             \
-                    (int *)malloc(v##_view.shape.length * sizeof(int));   \
-                __tensor_print(v##_view, v##_indices, 0, "\t\t");         \
+                    (int *)malloc(v##_view.shape.length * sizeof(int));        \
+                assert(v##_indices != NULL && "Memory allocation failed");     \
+                __tensor_print(v##_view, v##_indices, 0, "\t\t");              \
+                free(v##_indices);                                             \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \
@@ -100,3 +109,18 @@ Variable variable_new(Tensor tensor);
 #define var_rand(NAME, ...)                                                    \
     tensor_rand(NAME, __VA_ARGS__);                                            \
     var_from(NAME, NAME##_rand_tensor)
+
+Variable var_copy(Variable variable, bool preserve_tree);
+#define var_free(...)                                                          \
+    do {                                                                       \
+        Variable variables[] = {__VA_ARGS__};                                  \
+        for (size_t i = 0; i < ARR_LEN(variables); ++i) {                      \
+            Variable copy = var_copy(variables[i], false);                     \
+            variables[i].op = OP_LEAF;                                         \
+            free(variables[i].left);                                           \
+            free(variables[i].right);                                          \
+            tensor_free(variables[i].grad);                                    \
+            tensor_free(variables[i].items);                                   \
+            variables[i] = copy;                                               \
+        }                                                                      \
+    } while (0)

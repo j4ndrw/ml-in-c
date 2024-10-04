@@ -2,6 +2,7 @@
 #include "tensor.h"
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,10 +27,12 @@ Variable variable_op(Variable *left, ...) {
 
     if (strcmp(op_str, "+") != 0 && strcmp(op_str, "-") != 0 &&
         strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0 &&
-        strcmp(op_str, "@") != 0 && strcmp(op_str, "<+>") != 0) {
+        strcmp(op_str, "@") != 0 && strcmp(op_str, "[+]") != 0 &&
+        strcmp(op_str, "<+>") != 0 && strcmp(op_str, "<->") != 0 &&
+        strcmp(op_str, "<*>") != 0 && strcmp(op_str, "<^>") != 0) {
         fprintf(stderr,
                 "Invalid op character. Expected one of {'+', '-', '*', '/', "
-                "'@'}, but found %s\n",
+                "'@', '[+]', '<+>', '<->', '<*>', '<^>'}, but found %s\n",
                 op_str);
         exit(EXIT_FAILURE);
     }
@@ -45,8 +48,16 @@ Variable variable_op(Variable *left, ...) {
         op = OP_DIV;
     else if (strcmp(op_str, "@") == 0)
         op = OP_DOT;
-    else if (strcmp(op_str, "<+>") == 0)
+    else if (strcmp(op_str, "[+]") == 0)
         op = OP_ACCUM_SUM;
+    else if (strcmp(op_str, "<+>") == 0)
+        op = OP_SCALAR_SUM;
+    else if (strcmp(op_str, "<->") == 0)
+        op = OP_SCALAR_SUM;
+    else if (strcmp(op_str, "<*>") == 0)
+        op = OP_SCALAR_MUL;
+    else if (strcmp(op_str, "<^>") == 0)
+        op = OP_SCALAR_POW;
     else
         op = OP_LEAF;
 
@@ -73,6 +84,10 @@ Variable variable_op(Variable *left, ...) {
     __fwd_case(OP_DIV, tensor_div);
     __fwd_case(OP_DOT, tensor_dot);
     __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
+    __fwd_case(OP_SCALAR_SUM, tensor_scalar_sum);
+    __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff);
+    __fwd_case(OP_SCALAR_MUL, tensor_scalar_mul);
+    __fwd_case(OP_SCALAR_POW, tensor_scalar_pow);
 
     return variable;
 }
@@ -106,46 +121,104 @@ Tensor chain_rule_div_denominator(Variable left, Variable right) {
     return result;
 }
 
+Tensor chain_rule_pow(Variable base, Variable pow) {
+    return tensor_mul(
+        pow.grad,
+        tensor_scalar_pow(base.items,
+                          tensor_scalar_diff(pow.grad, tensor_new_scalar(1))));
+}
+
+Tensor chain_rule_base_pow(Variable base, Variable pow) {
+    return tensor_scalar_mul(tensor_scalar_pow(base.grad, pow.items),
+                             tensor_natural_log(base.grad));
+}
+
 void variable_backward(Variable *root) {
-    if (root == NULL || root->left == NULL)
+    if (root == NULL || root->left == NULL || root->right == NULL) {
         return;
+    }
+
+    tensor_reset_shape(&root->left->items);
+    tensor_reset_shape(&root->right->items);
+    tensor_reset_shape(&root->left->grad);
+    tensor_reset_shape(&root->right->grad);
+
+    if (root->left->grad.data == NULL || root->left->items.data == NULL ||
+        root->left->items.length == 0 || root->left->items.shape.length == 0 ||
+        root->left->items.shape.data == NULL) {
+        return;
+    }
+
+    if (root->right->grad.data == NULL || root->right->items.data == NULL ||
+        root->right->items.length == 0 ||
+        root->right->items.shape.length == 0 ||
+        root->right->items.shape.data == NULL) {
+        return;
+    }
+    Variable left = *root->left;
+    Variable right = *root->right;
+
+#define __add_derivative                                                       \
+    do {                                                                       \
+        root->left->grad = tensor_ones(root->left->grad.length);               \
+        root->right->grad = tensor_ones(root->right->grad.length);             \
+    } while (0);
+#define __sub_derivative                                                       \
+    do {                                                                       \
+        root->left->grad = tensor_ones(root->left->grad.length);               \
+        root->right->grad = tensor_from(root->right->grad.length, -1);         \
+    } while (0);
+#define __mul_derivative                                                       \
+    do {                                                                       \
+        Tensor left_grad = chain_rule_mul(*root->right);                       \
+        Tensor right_grad = chain_rule_mul(*root->left);                       \
+        root->left->grad = left_grad;                                          \
+        root->right->grad = right_grad;                                        \
+    } while (0);
+#define __div_derivative                                                       \
+    do {                                                                       \
+        root->left->grad = chain_rule_div_numerator(right);                    \
+        root->right->grad = chain_rule_div_denominator(left, right);           \
+    } while (0);
+#define __pow_derivative                                                       \
+    do {                                                                       \
+        root->left->grad = chain_rule_pow(left, right);                        \
+        root->right->grad = chain_rule_base_pow(left, right);                  \
+    } while (0);
+
+#define __case(op, fn)                                                         \
+    case (op):                                                                 \
+        fn break
 
     switch (root->op) {
-    case OP_ADD: {
-        root->left->grad = tensor_ones(root->left->grad.length);
-        root->right->grad = tensor_ones(root->right->grad.length);
-    } break;
-    case OP_SUB: {
-        root->left->grad = tensor_ones(root->left->grad.length);
-        root->right->grad = tensor_ones(root->right->grad.length);
-    } break;
-    case OP_ACCUM_SUM: {
-        root->left->grad = tensor_ones(root->left->grad.length);
-        root->right->grad = tensor_ones(root->right->grad.length);
-    } break;
-    case OP_DOT: {
-        Tensor left_grad = chain_rule_mul(*root->right);
-        Tensor right_grad = chain_rule_mul(*root->left);
-        root->left->grad = left_grad;
-        root->right->grad = right_grad;
-    } break;
-    case OP_MUL: {
-        Tensor left_grad = chain_rule_mul(*root->right);
-        Tensor right_grad = chain_rule_mul(*root->left);
-        root->left->grad = left_grad;
-        root->right->grad = right_grad;
-    } break;
-    case OP_DIV: {
-        Variable left = *root->left;
-        Variable right = *root->right;
-        root->left->grad = chain_rule_div_numerator(right);
-        root->right->grad =
-            chain_rule_div_denominator(left, right);
-    } break;
+        __case(OP_ADD, __add_derivative);
+        __case(OP_SCALAR_SUM, __add_derivative);
+        __case(OP_ACCUM_SUM, __add_derivative);
+        __case(OP_SUB, __sub_derivative);
+        __case(OP_SCALAR_DIFF, __sub_derivative);
+        __case(OP_MUL, __mul_derivative);
+        __case(OP_DOT, __mul_derivative);
+        __case(OP_SCALAR_MUL, __mul_derivative);
+        __case(OP_DIV, __div_derivative);
+        __case(OP_SCALAR_POW, __pow_derivative);
     default:
         break;
     }
 
     variable_backward(root->left);
     variable_backward(root->right);
+
+#undef __add_derivative
+#undef __sub_derivative
+#undef __mul_derivative
+#undef __div_derivative
+#undef __pow_derivative
+}
+
+Variable var_copy(Variable variable, bool preserve_tree) {
+    return (Variable){.left = preserve_tree ? variable.left : NULL,
+                      .right = preserve_tree ? variable.right : NULL,
+                      .items = tensor_copy(variable.items),
+                      .grad = tensor_copy(variable.grad),
+                      .op = variable.op};
 }
