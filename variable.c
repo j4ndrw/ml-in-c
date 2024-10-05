@@ -75,50 +75,6 @@ Variable variable_op(Variable *left, ...) {
     return variable;
 }
 
-Tensor chain_rule_mul(Variable partial, Variable term) {
-    Tensor result = tensor_zeros(partial.grad.length);
-    for (int i = 0; i < partial.grad.length; ++i) {
-        result.data[i] = term.items.data[i] * partial.grad.data[i];
-    }
-    return result;
-}
-
-Tensor chain_rule_div_numerator(Variable variable) {
-    Tensor result = tensor_zeros(variable.grad.length);
-    for (int i = 0; i < variable.grad.length; ++i) {
-        result.data[i] = 1 / variable.items.data[i];
-    }
-    return result;
-}
-
-Tensor chain_rule_div_denominator(Variable left, Variable right) {
-    if (left.grad.length == 0) left.grad = tensor_ones(right.grad.length);
-    if (right.grad.length == 0) right.grad = tensor_ones(left.grad.length);
-
-    assert(left.grad.length == right.grad.length &&
-           "Tensor gradients must be of same length");
-    size_t n = left.grad.length;
-    Tensor result = tensor_zeros(n);
-    for (int i = 0; i < n; ++i) {
-        float u = left.items.data[i];
-        float v = right.items.data[i];
-        result.data[i] = (-u * left.grad.data[i]) / (v * v);
-    }
-    return result;
-}
-
-Tensor chain_rule_pow(Variable base, Variable pow) {
-    return tensor_mul(
-        pow.grad,
-        tensor_scalar_pow(base.items,
-                          tensor_scalar_diff(pow.grad, tensor_new_scalar(1))));
-}
-
-Tensor chain_rule_base_pow(Variable base, Variable pow) {
-    return tensor_scalar_mul(tensor_scalar_pow(base.grad, pow.items),
-                             tensor_natural_log(base.grad));
-}
-
 Variable variable_forward(Variable *root) {
 #define __fwd_case(operator, func)                                             \
     if (root->op == (operator) && root->left->items.length > 0 &&              \
@@ -165,11 +121,6 @@ void variable_backward(Variable *root) {
         return;
     }
 
-    if (root->left->grad.length == 0)
-        root->left->grad = tensor_ones(root->left->items.length);
-    if (root->right->grad.length == 0)
-        root->right->grad = tensor_ones(root->right->items.length);
-
 #define __add_derivative                                                       \
     do {                                                                       \
         root->left->grad = tensor_ones(root->left->grad.length);               \
@@ -182,28 +133,33 @@ void variable_backward(Variable *root) {
     } while (0);
 #define __mul_derivative                                                       \
     do {                                                                       \
-        root->left->grad = chain_rule_mul(*root, *root->right);                \
-        root->right->grad = chain_rule_mul(*root, *root->left);                \
+        root->left->grad = chain_rule_mul(root->grad, root->right->items);     \
+        root->right->grad = chain_rule_mul(root->grad, root->left->items);     \
     } while (0);
 #define __div_derivative                                                       \
     do {                                                                       \
-        Tensor left_grad = chain_rule_div_numerator(*root->right);             \
-        Tensor right_grad =                                                    \
-            chain_rule_div_denominator(*root->left, *root->right);             \
+        Tensor left_grad =                                                     \
+            chain_rule_div_numerator(root->right->grad, root->right->items);   \
+        Tensor right_grad = chain_rule_div_denominator(                        \
+            root->left->grad, root->left->items, root->right->items);          \
         root->left->grad = left_grad;                                          \
         root->right->grad = right_grad;                                        \
     } while (0);
 #define __pow_derivative                                                       \
     do {                                                                       \
-        Tensor left_grad = chain_rule_pow(*root->left, *root->right);          \
-        Tensor right_grad = chain_rule_base_pow(*root->left, *root->right);    \
+        Tensor left_grad =                                                     \
+            chain_rule_pow(root->left->items, root->right->grad);              \
+        Tensor right_grad =                                                    \
+            chain_rule_base_pow(root->left->grad, root->right->items);         \
         root->left->grad = left_grad;                                          \
         root->right->grad = right_grad;                                        \
     } while (0);
 
 #define __case(op, fn)                                                         \
     case (op):                                                                 \
-        fn break
+        fn variable_backward(root->left);                                      \
+        variable_backward(root->right);                                        \
+        return
 
     switch (root->op) {
         __case(OP_ADD, __add_derivative);
@@ -211,7 +167,14 @@ void variable_backward(Variable *root) {
         __case(OP_ACCUM_SUM, __add_derivative);
         __case(OP_SUB, __sub_derivative);
         __case(OP_SCALAR_DIFF, __sub_derivative);
-        __case(OP_MUL, __mul_derivative);
+    case (OP_MUL):
+        do {
+            root->left->grad = chain_rule_mul(root->grad, root->right->items);
+            root->right->grad = chain_rule_mul(root->grad, root->left->items);
+        } while (0);
+        variable_backward(root->left);
+        variable_backward(root->right);
+        return;
         __case(OP_DOT, __mul_derivative);
         __case(OP_SCALAR_MUL, __mul_derivative);
         __case(OP_DIV, __div_derivative);
@@ -220,14 +183,12 @@ void variable_backward(Variable *root) {
         break;
     }
 
-    variable_backward(root->left);
-    variable_backward(root->right);
-
 #undef __add_derivative
 #undef __sub_derivative
 #undef __mul_derivative
 #undef __div_derivative
 #undef __pow_derivative
+#undef __case
 }
 
 Variable var_copy(Variable variable, bool preserve_tree) {

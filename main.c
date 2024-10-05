@@ -16,8 +16,11 @@ void mse_test() {
     var_print(a, items, {});
     var_print(b, items, {});
     Variable loss = loss_mse(&a, &b);
-    forward(&loss);
+    Variable graph = forward(&loss);
+    backward(&graph);
     var_print(loss, items, {});
+    var_print(a, grad, {});
+    var_print(b, grad, {});
 }
 
 void simple_neuron_test() {
@@ -41,9 +44,9 @@ void simple_neuron_test() {
         optimizer_sgd_step(&optimizer);
 
         if (epoch % 100 == 0) {
-            var_print(weights, grad, {});
-            printf("EPOCH: %zu | LOSS: %f | WEIGHT: %f\n", epoch,
-                   loss.items.data[0], weights.items.data[0]);
+            printf("EPOCH: %zu | LOSS: %f | WEIGHT: %f | WEIGHT_GRAD: %f\n",
+                   epoch, loss.items.data[0], weights.items.data[0],
+                   weights.grad.data[0]);
         }
     }
 
@@ -59,7 +62,6 @@ void mul_gradient_test() {
     var_print(a, grad, {});
     var_print(b, grad, {});
 }
-
 
 void div_gradient_test() {
     var_new(a, {8});
@@ -140,8 +142,8 @@ int main() {
     // simple_backprop_test();
     // dot_product_test();
     // div_gradient_test();
-    // mse_test();
-    simple_neuron_test();
+    mse_test();
+    // simple_neuron_test();
     // mul_gradient_test();
     return 0;
 }

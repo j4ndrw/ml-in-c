@@ -39,12 +39,6 @@ Variable variable_forward(Variable *root);
 #define backward(x) variable_backward((x))
 void variable_backward(Variable *root);
 
-Tensor chain_rule_mul(Variable term, Variable constant);
-Tensor chain_rule_div_numerator(Variable variable);
-Tensor chain_rule_div_denominator(Variable left, Variable right);
-Tensor chain_rule_pow(Variable base, Variable pow);
-Tensor chain_rule_base_pow(Variable base, Variable pow);
-
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
         printf("%s.%s = {\n", #v, #kind);                                      \

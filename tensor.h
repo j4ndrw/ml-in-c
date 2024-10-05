@@ -84,3 +84,9 @@ Tensor tensor_new_scalar(float value);
 void tensor_reset_shape(Tensor *t);
 Tensor tensor_copy(Tensor tensor);
 void tensor_free(Tensor tensor);
+
+Tensor chain_rule_mul(Tensor grad, Tensor tensor);
+Tensor chain_rule_div_numerator(Tensor grad, Tensor tensor);
+Tensor chain_rule_div_denominator(Tensor grad, Tensor left, Tensor right);
+Tensor chain_rule_pow(Tensor grad, Tensor tensor);
+Tensor chain_rule_base_pow(Tensor grad, Tensor tensor);

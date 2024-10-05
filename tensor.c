@@ -14,12 +14,11 @@ Tensor tensor_empty(size_t length) {
     tensor.length = length;
     tensor.shape.data = (size_t *)malloc(sizeof(size_t));
     assert(tensor.shape.data != NULL && "Memory allocation failed");
-    tensor.shape.length = 1;
+    tensor.shape.length = length;
     tensor.shape.data[0] = length;
 
-    // Initialize all elements to zero
     for (size_t i = 0; i < length; ++i) {
-        tensor.data[i] = 0.0f; // Set each element to zero
+        tensor.data[i] = 0.0f;
     }
 
     return tensor;
@@ -267,8 +266,9 @@ Tensor tensor_natural_log(Tensor t) {
 }
 
 Tensor tensor_new_scalar(float value) {
-    tensor_new(scalar, 1, {value});
-    return scalar_tensor;
+    Tensor scalar = tensor_empty(1);
+    scalar.data[0] = value;
+    return scalar;
 }
 
 void tensor_reset_shape(Tensor *t) {
@@ -293,4 +293,42 @@ void tensor_free(Tensor tensor) {
     tensor.shape.length = 0;
     free(tensor.data);
     free(tensor.shape.data);
+}
+
+Tensor chain_rule_mul(Tensor grad, Tensor tensor) {
+    Tensor result = tensor_zeros(grad.length);
+    for (int i = 0; i < grad.length; ++i) {
+        result.data[i] = tensor.data[i] * grad.data[i];
+    }
+    return result;
+}
+
+Tensor chain_rule_div_numerator(Tensor grad, Tensor tensor) {
+    Tensor result = tensor_zeros(grad.length);
+    for (int i = 0; i < grad.length; ++i) {
+        result.data[i] = 1 / tensor.data[i];
+    }
+    return result;
+}
+
+Tensor chain_rule_div_denominator(Tensor grad, Tensor left, Tensor right) {
+    size_t n = grad.length;
+    Tensor result = tensor_zeros(n);
+    for (int i = 0; i < n; ++i) {
+        float u = left.data[i];
+        float v = right.data[i];
+        result.data[i] = (-u * grad.data[i]) / (v * v);
+    }
+    return result;
+}
+
+Tensor chain_rule_pow(Tensor grad, Tensor tensor) {
+    return tensor_mul(
+        grad, tensor_scalar_pow(
+                  tensor, tensor_scalar_diff(grad, tensor_new_scalar(1))));
+}
+
+Tensor chain_rule_base_pow(Tensor grad, Tensor tensor) {
+    return tensor_scalar_mul(tensor_scalar_pow(grad, tensor),
+                             tensor_natural_log(grad));
 }

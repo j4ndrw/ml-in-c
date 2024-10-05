@@ -9,5 +9,6 @@ Variable loss_mse(Variable *actual, Variable *predicted) {
     var_expr(diff, op(actual, -, predicted));
     var_expr(squared, op(&diff, <^>, &pow));
     var_expr(acc_sum, op(&sum, [+], &squared));
-    return op(&acc_sum, /, &n);
+    var_expr(result, op(&acc_sum, /, &n));
+    return result;
 }
