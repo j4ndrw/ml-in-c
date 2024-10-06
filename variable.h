@@ -20,6 +20,8 @@ typedef enum {
     OP_SCALAR_DIFF,
     OP_SCALAR_MUL,
     OP_SCALAR_POW,
+    OP_SCALAR_SQ,
+    OP_SQ,
 } Op;
 
 typedef struct Variable {
@@ -31,6 +33,7 @@ typedef struct Variable {
 } Variable;
 
 #define op(left, op, right) variable_op((left), (#op), (right))
+#define op_self(var, op) variable_op((var), (#op))
 Variable variable_op(struct Variable *left, ...);
 
 #define forward(x) variable_forward((x))
@@ -41,18 +44,27 @@ void variable_backward(Variable *root);
 
 #define var_print(v, kind, ...)                                                \
     do {                                                                       \
+        Tensor t = v.kind;                                                     \
+        tensor_reset_shape(&t);                                                \
+        size_t shape[] = __VA_ARGS__;                                          \
+        size_t shape_len = ARR_LEN(shape);                                     \
+        tensor_view(t, __VA_ARGS__);                                           \
+        shape_len = tensor_shape_len(t);                                       \
         printf("%s.%s = {\n", #v, #kind);                                      \
         {                                                                      \
-            printf("\tdata = {\n");                                            \
-            printf("\t\t");                                                    \
+            printf("\tshape = { ");                                            \
             {                                                                  \
-                for (size_t i = 0; i < v.kind.length; ++i) {                   \
-                    if (i == v.kind.length - 1) {                              \
-                        printf("%f", v.kind.data[i]);                          \
-                    } else {                                                   \
-                        printf("%f, ", v.kind.data[i]);                        \
-                    }                                                          \
+                size_t shape_idx = 0;                                          \
+                while (t.shape[shape_idx] != 0) {                              \
+                    printf("%zu, ", t.shape[shape_idx]);                       \
+                    shape_idx++;                                               \
                 }                                                              \
+            }                                                                  \
+            printf(" }\n");                                                    \
+            printf("\tdata = {\n");                                            \
+            {                                                                  \
+                int *v##_indices = (int *)malloc(shape_len * sizeof(int));     \
+                tensor_print(t, v##_indices, 0, "\t\t");                       \
             }                                                                  \
             printf("\n\t}\n");                                                 \
         }                                                                      \

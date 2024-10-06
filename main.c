@@ -5,42 +5,48 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "activation.h"
 #include "loss.h"
 #include "optimizer.h"
 #include "tensor.h"
 #include "variable.h"
 
 void mse_test() {
-    var_new(a, {44});
-    var_new(b, {99});
-    var_print(a, items, {});
-    var_print(b, items, {});
-    Variable loss = loss_mse(&a, &b);
-    Variable graph = forward(&loss);
-    backward(&graph);
+    var_new(inputs, {44});
+    var_new(labels, {99});
+    var_print(inputs, items, {});
+    var_print(labels, items, {});
+    loss_mse(loss, inputs, labels);
+    forward(&loss);
+    backward(&loss);
     var_print(loss, items, {});
-    var_print(a, grad, {});
-    var_print(b, grad, {});
+    var_print(inputs, grad, {});
+    var_print(labels, grad, {});
 }
 
 void simple_neuron_test() {
+    // Data
     var_new(inputs, {1, 2, 3, 4, 5, 6});
     var_new(labels, {2, 4, 6, 8, 10, 12});
 
-    var_rand(weights, {1});
+    // Hyperparams
     size_t epochs = 1000;
-    float learning_rate = 0.01;
+    float learning_rate = 0.001;
+
+    // Model
+    var_rand(weights, {1});
+    weights.items.data[0] = (float)(rand() % 100) / 100.0f;
+
+    // Training
     SGDOptimizer optimizer =
         optimizer_sgd_create(&weights, NULL, learning_rate);
 
+    var_expr(prediction, op(&inputs, <*>, &weights));
+    loss_mse(loss, labels, prediction);
     for (size_t epoch = 0; epoch < epochs; ++epoch) {
         optimizer_sgd_zero_grad(&optimizer);
-
-        var_expr(prediction, op(&inputs, <*>, &weights));
-        var_expr(loss, loss_mse(&labels, &prediction));
-
-        Variable graph = forward(&loss);
-        backward(&graph);
+        forward(&loss);
+        backward(&loss);
         optimizer_sgd_step(&optimizer);
 
         if (epoch % 100 == 0) {
@@ -50,15 +56,20 @@ void simple_neuron_test() {
         }
     }
 
-    var_free(inputs, labels, weights);
+    // Validation
+    var_new(test, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+    var_expr(predictions, op(&test, <*>, &weights));
+    forward(&predictions);
+    var_print(test, items, {});
+    var_print(predictions, items, {});
 }
 
 void mul_gradient_test() {
     var_new(a, {2});
     var_new(b, {3});
     var_expr(div, op(&a, *, &b));
-    Variable graph = forward(&div);
-    backward(&graph);
+    forward(&div);
+    backward(&div);
     var_print(a, grad, {});
     var_print(b, grad, {});
 }
@@ -67,8 +78,8 @@ void div_gradient_test() {
     var_new(a, {8});
     var_new(b, {2});
     var_expr(div, op(&a, /, &b));
-    Variable graph = forward(&div);
-    backward(&graph);
+    forward(&div);
+    backward(&div);
     var_print(a, grad, {});
     var_print(b, grad, {});
 }
@@ -139,11 +150,12 @@ void simple_backprop_test() {
 
 int main() {
     srand(time(NULL));
-    // simple_backprop_test();
-    // dot_product_test();
-    // div_gradient_test();
-    mse_test();
-    // simple_neuron_test();
+    // mse_test();
+    //simple_neuron_test();
     // mul_gradient_test();
+    div_gradient_test();
+    // multidim_dot_product_test();
+    // dot_product_test();
+    // simple_backprop_test();
     return 0;
 }

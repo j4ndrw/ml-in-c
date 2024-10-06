@@ -1,5 +1,6 @@
 #include "variable.h"
 #include "tensor.h"
+#include "utils.h"
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -10,11 +11,11 @@
 
 Variable variable_new(Tensor tensor) {
     Variable variable;
-    variable.left = NULL;
-    variable.right = NULL;
+    variable.left = (Variable *)NULL;
+    variable.right = (Variable *)NULL;
     variable.op = OP_LEAF;
     variable.items = tensor;
-    variable.grad = tensor_ones(tensor.length);
+    variable.grad = tensor_zeros(tensor.length);
     return variable;
 }
 
@@ -29,10 +30,11 @@ Variable variable_op(Variable *left, ...) {
         strcmp(op_str, "*") != 0 && strcmp(op_str, "/") != 0 &&
         strcmp(op_str, "@") != 0 && strcmp(op_str, "[+]") != 0 &&
         strcmp(op_str, "<+>") != 0 && strcmp(op_str, "<->") != 0 &&
-        strcmp(op_str, "<*>") != 0 && strcmp(op_str, "<^>") != 0) {
+        strcmp(op_str, "<*>") != 0 && strcmp(op_str, "<^>") != 0 &&
+        strcmp(op_str, "**") != 0) {
         fprintf(stderr,
                 "Invalid op character. Expected one of {'+', '-', '*', '/', "
-                "'@', '[+]', '<+>', '<->', '<*>', '<^>'}, but found %s\n",
+                "'@', '[+]', '<+>', '<->', '<*>', '<^>', '**'}, but found %s\n",
                 op_str);
         exit(EXIT_FAILURE);
     }
@@ -58,6 +60,8 @@ Variable variable_op(Variable *left, ...) {
         op = OP_SCALAR_MUL;
     else if (strcmp(op_str, "<^>") == 0)
         op = OP_SCALAR_POW;
+    else if (strcmp(op_str, "**") == 0)
+        op = OP_SCALAR_SQ;
     else
         op = OP_LEAF;
 
@@ -76,112 +80,126 @@ Variable variable_op(Variable *left, ...) {
 }
 
 Variable variable_forward(Variable *root) {
+    if (DUMB_NULL_CHECK(root))
+        return variable_new(tensor_empty(1));
+
 #define __fwd_case(operator, func)                                             \
-    if (root->op == (operator) && root->left->items.length > 0 &&              \
-        root->right->items.length > 0) {                                       \
+    if (root->op == (operator)) {                                              \
         Variable left = variable_forward(root->left);                          \
         Variable right = variable_forward(root->right);                        \
-        if (left.items.length == 0 && right.items.length == 0)                 \
-            return variable_new(tensor_zeros(0));                              \
-        if (left.items.length == 0)                                            \
-            return right;                                                      \
-        if (right.items.length == 0)                                           \
-            return left;                                                       \
+        if (left.items.length == 0 || right.items.length == 0)                 \
+            return variable_new(tensor_empty(1));                              \
         root->items = (func)(left.items, right.items);                         \
-        if (root == NULL)                                                      \
-            return variable_new(tensor_zeros(0));                              \
         return *root;                                                          \
     }
 
-    if (root == NULL)
-        return variable_new(tensor_zeros(0));
-    if (root->left == NULL)
-        return *root;
-    if (root->right == NULL)
-        return *root;
+#define __fwd_case_self(operator, func)                                        \
+    if (root->op == (operator)) {                                              \
+        Variable left = variable_forward(root->left);                          \
+        if (left.items.length == 0)                                            \
+            return variable_new(tensor_empty(1));                              \
+        root->items = (func)(left.items);                                      \
+        return *root;                                                          \
+    }
 
     __fwd_case(OP_ADD, tensor_add);
     __fwd_case(OP_SUB, tensor_sub);
     __fwd_case(OP_MUL, tensor_mul);
     __fwd_case(OP_DIV, tensor_div);
     __fwd_case(OP_DOT, tensor_dot);
-    __fwd_case(OP_ACCUM_SUM, tensor_scalar_accumulate);
+    __fwd_case_self(OP_ACCUM_SUM, tensor_sum);
     __fwd_case(OP_SCALAR_SUM, tensor_scalar_sum);
     __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff);
     __fwd_case(OP_SCALAR_MUL, tensor_scalar_mul);
     __fwd_case(OP_SCALAR_POW, tensor_scalar_pow);
-
-    return variable_new(tensor_zeros(0));
+    __fwd_case_self(OP_SCALAR_SQ, tensor_scalar_sq);
 
 #undef __fwd_case
+
+    if (DUMB_NULL_CHECK(root))
+        return variable_new(tensor_empty(1));
+    return *root;
 }
 
 void variable_backward(Variable *root) {
-    if (root == NULL || root->left == NULL || root->right == NULL) {
+    if (DUMB_NULL_CHECK(root))
         return;
-    }
+    if (DUMB_NULL_CHECK(root->left) && !DUMB_NULL_CHECK(root->right))
+        return variable_backward(root->right);
+    if (DUMB_NULL_CHECK(root->right) && !DUMB_NULL_CHECK(root->left))
+        return variable_backward(root->left);
+    if (DUMB_NULL_CHECK(root->left) && DUMB_NULL_CHECK(root->right))
+        return;
+
+    Op op = root->op;
+    Tensor grad = root->grad;
+    Tensor left_grad = root->left->grad;
+    Tensor left_items = root->left->items;
+    Tensor right_grad = root->right->grad;
+    Tensor right_items = root->right->items;
 
 #define __add_derivative                                                       \
-    do {                                                                       \
-        root->left->grad = tensor_ones(root->left->grad.length);               \
-        root->right->grad = tensor_ones(root->right->grad.length);             \
-    } while (0);
+    chain_rule_add(new_left_grad, grad);                                       \
+    chain_rule_add(new_right_grad, grad);                                      \
+    left_grad = new_left_grad;                                                 \
+    right_grad = new_right_grad;
+
 #define __sub_derivative                                                       \
-    do {                                                                       \
-        root->left->grad = tensor_ones(root->left->grad.length);               \
-        root->right->grad = tensor_from(root->right->grad.length, -1);         \
-    } while (0);
+    chain_rule_sub_left(new_left_grad, grad);                                  \
+    chain_rule_sub_right(new_right_grad, grad);                                \
+    left_grad = new_left_grad;                                                 \
+    right_grad = new_right_grad;
+
 #define __mul_derivative                                                       \
-    do {                                                                       \
-        root->left->grad = chain_rule_mul(root->grad, root->right->items);     \
-        root->right->grad = chain_rule_mul(root->grad, root->left->items);     \
-    } while (0);
+    chain_rule_mul(new_left_grad, grad, right_items);                          \
+    chain_rule_mul(new_right_grad, grad, left_items);                          \
+    left_grad = new_left_grad;                                                 \
+    right_grad = new_right_grad;
+
 #define __div_derivative                                                       \
-    do {                                                                       \
-        Tensor left_grad =                                                     \
-            chain_rule_div_numerator(root->right->grad, root->right->items);   \
-        Tensor right_grad = chain_rule_div_denominator(                        \
-            root->left->grad, root->left->items, root->right->items);          \
-        root->left->grad = left_grad;                                          \
-        root->right->grad = right_grad;                                        \
-    } while (0);
+    chain_rule_div_numerator(new_left_grad, right_grad, right_items);          \
+    chain_rule_div_denominator(new_right_grad, left_grad, left_items,          \
+                               right_items);                                   \
+    left_grad = new_left_grad;                                                 \
+    right_grad = new_right_grad;
+
 #define __pow_derivative                                                       \
+    chain_rule_pow(new_left_grad, left_items, right_grad);                     \
+    chain_rule_base_pow(new_right_grad, left_grad, right_items);               \
+    left_grad = new_left_grad;                                                 \
+    right_grad = new_right_grad;
+
+#define __case(OP, FN)                                                         \
     do {                                                                       \
-        Tensor left_grad =                                                     \
-            chain_rule_pow(root->left->items, root->right->grad);              \
-        Tensor right_grad =                                                    \
-            chain_rule_base_pow(root->left->grad, root->right->items);         \
-        root->left->grad = left_grad;                                          \
-        root->right->grad = right_grad;                                        \
-    } while (0);
+        if (op == OP) {                                                        \
+            FN;                                                                \
+            root->left->grad = left_grad;                                      \
+            root->right->grad = right_grad;                                    \
+            variable_backward(root->left);                                     \
+            variable_backward(root->right);                                    \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
 
-#define __case(op, fn)                                                         \
-    case (op):                                                                 \
-        fn variable_backward(root->left);                                      \
+#define __default                                                              \
+    do {                                                                       \
+        variable_backward(root->left);                                         \
         variable_backward(root->right);                                        \
-        return
+        return;                                                                \
+    } while (0)
 
-    switch (root->op) {
-        __case(OP_ADD, __add_derivative);
-        __case(OP_SCALAR_SUM, __add_derivative);
-        __case(OP_ACCUM_SUM, __add_derivative);
-        __case(OP_SUB, __sub_derivative);
-        __case(OP_SCALAR_DIFF, __sub_derivative);
-    case (OP_MUL):
-        do {
-            root->left->grad = chain_rule_mul(root->grad, root->right->items);
-            root->right->grad = chain_rule_mul(root->grad, root->left->items);
-        } while (0);
-        variable_backward(root->left);
-        variable_backward(root->right);
-        return;
-        __case(OP_DOT, __mul_derivative);
-        __case(OP_SCALAR_MUL, __mul_derivative);
-        __case(OP_DIV, __div_derivative);
-        __case(OP_SCALAR_POW, __pow_derivative);
-    default:
-        break;
-    }
+    __case(OP_ADD, __add_derivative);
+    __case(OP_SCALAR_SUM, __add_derivative);
+    __case(OP_ACCUM_SUM, __add_derivative);
+    __case(OP_SUB, __sub_derivative);
+    __case(OP_SCALAR_DIFF, __sub_derivative);
+    __case(OP_MUL, __mul_derivative);
+    __case(OP_DOT, __mul_derivative);
+    __case(OP_SCALAR_MUL, __mul_derivative);
+    __case(OP_DIV, __div_derivative);
+    __case(OP_SCALAR_POW, __pow_derivative);
+    __case(OP_SQ, __pow_derivative);
+    __default;
 
 #undef __add_derivative
 #undef __sub_derivative
@@ -189,6 +207,7 @@ void variable_backward(Variable *root) {
 #undef __div_derivative
 #undef __pow_derivative
 #undef __case
+#undef __default
 }
 
 Variable var_copy(Variable variable, bool preserve_tree) {
