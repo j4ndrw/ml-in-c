@@ -22,6 +22,7 @@ typedef enum {
     OP_SCALAR_DIV,
     OP_SCALAR_POW,
     OP_SCALAR_SQ,
+    OP_EXP,
 } Op;
 
 typedef struct Variable {

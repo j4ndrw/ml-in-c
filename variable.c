@@ -33,12 +33,14 @@ Variable variable_op(Variable *left, ...) {
         strcmp(op_str, "@") != 0 && strcmp(op_str, "[+]") != 0 &&
         strcmp(op_str, "<+>") != 0 && strcmp(op_str, "<->") != 0 &&
         strcmp(op_str, "<*>") != 0 && strcmp(op_str, "</>") != 0 &&
-        strcmp(op_str, "<^>") != 0 && strcmp(op_str, "**") != 0) {
-        fprintf(stderr,
-                "Invalid op character. Expected one of {'+', '-', '*', '/', "
-                "'@', '[+]', '<+>', '<->', '<*>', '</>', '<^>', '**'}, but "
-                "found %s\n",
-                op_str);
+        strcmp(op_str, "<^>") != 0 && strcmp(op_str, "**") != 0 &&
+        strcmp(op_str, "exp") != 0) {
+        fprintf(
+            stderr,
+            "Invalid op character. Expected one of {'+', '-', '*', '/', "
+            "'@', '[+]', '<+>', '<->', '<*>', '</>', '<^>', '**', 'exp'}, but "
+            "found %s\n",
+            op_str);
         exit(EXIT_FAILURE);
     }
 
@@ -67,6 +69,8 @@ Variable variable_op(Variable *left, ...) {
         op = OP_SCALAR_POW;
     else if (strcmp(op_str, "**") == 0)
         op = OP_SCALAR_SQ;
+    else if (strcmp(op_str, "exp") == 0)
+        op = OP_EXP;
     else
         op = OP_LEAF;
 
@@ -95,10 +99,10 @@ Variable variable_op(Variable *left, ...) {
     }
 
     __fwd_case(OP_ADD, tensor_add, chain_rule_add);
-    __fwd_case(OP_SUB, tensor_sub, chain_rule_add);
+    __fwd_case(OP_SUB, tensor_sub, chain_rule_sub);
     __fwd_case_self(OP_ACCUM_SUM, tensor_sum, chain_rule_add);
     __fwd_case(OP_SCALAR_SUM, tensor_scalar_sum, chain_rule_add);
-    __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff, chain_rule_add);
+    __fwd_case(OP_SCALAR_DIFF, tensor_scalar_diff, chain_rule_sub);
     __fwd_case(OP_MUL, tensor_mul, chain_rule_mul);
     __fwd_case(OP_DOT, tensor_dot, chain_rule_mul);
     __fwd_case(OP_SCALAR_MUL, tensor_scalar_mul, chain_rule_mul);
@@ -106,6 +110,7 @@ Variable variable_op(Variable *left, ...) {
     __fwd_case(OP_SCALAR_DIV, tensor_scalar_mul, chain_rule_div);
     __fwd_case(OP_SCALAR_POW, tensor_scalar_pow, chain_rule_pow);
     __fwd_case_self(OP_SCALAR_SQ, tensor_scalar_sq, chain_rule_pow);
+    __fwd_case_self(OP_EXP, tensor_exp, chain_rule_exp);
 
 #undef __fwd_case
 #undef __fwd_case_self
@@ -118,14 +123,15 @@ void variable_backward(Variable *root) {
         return;
     }
 
-    if (!DUMB_NULL_CHECK(root->left) && !DUMB_NULL_CHECK(root->right)) {
-        (*root->backward)(root, root->left, root->right);
+    if (DUMB_NULL_CHECK(root->left) && DUMB_NULL_CHECK(root->right)) {
+        return;
     }
 
     if (!DUMB_NULL_CHECK(root->left))
         variable_backward(root->left);
     if (!DUMB_NULL_CHECK(root->right))
         variable_backward(root->right);
+    (*root->backward)(root, root->left, root->right);
 }
 
 Variable var_copy(Variable variable, bool preserve_tree) {

@@ -283,6 +283,15 @@ Tensor tensor_scalar_inverted(Tensor tensor) {
     return tensor_scalar_pow(tensor, tensor_new_scalar(-1));
 }
 
+Tensor tensor_exp(Tensor tensor) {
+    size_t length = tensor.length;
+    Tensor result = tensor_ones(length);
+    for (size_t i = 0; i < length; ++i) {
+        result.data[i] = exp(tensor.data[i]);
+    }
+    return result;
+}
+
 Tensor tensor_natural_log(Tensor t) {
     Tensor result = tensor_zeros(t.length);
     double eps = 1e-10;

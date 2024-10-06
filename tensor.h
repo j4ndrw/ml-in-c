@@ -105,3 +105,5 @@ Tensor tensor_scalar_pow(Tensor base, Tensor pow);
 Tensor tensor_scalar_sq(Tensor tensor);
 #define LN tensor_natural_log
 Tensor tensor_natural_log(Tensor t);
+#define EXP tensor_exp
+Tensor tensor_exp(Tensor tensor);
