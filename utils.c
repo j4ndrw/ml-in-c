@@ -1,3 +1,3 @@
 #include <stdlib.h>
 
-float randf() { return (float)rand() / (float)(RAND_MAX); }
+double randf64() { return (double)rand() / (double)(RAND_MAX); }

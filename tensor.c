@@ -8,7 +8,7 @@
 
 Tensor tensor_empty(size_t length) {
     Tensor tensor;
-    tensor.data = (float *)malloc((length > 0 ? length : 1) * sizeof(float));
+    tensor.data = (double *)malloc((length > 0 ? length : 1) * sizeof(double));
     assert(tensor.data != NULL && "Memory allocation failed");
 
     tensor.length = length;
@@ -32,7 +32,7 @@ Tensor tensor_ones(size_t length) {
     return ones;
 }
 
-Tensor tensor_from(size_t length, float value) {
+Tensor tensor_from(size_t length, double value) {
     Tensor from = tensor_empty(length);
 
     for (size_t i = 0; i < length; ++i) {
@@ -45,7 +45,7 @@ Tensor tensor_from(size_t length, float value) {
 // I couldn't be asked to reason about this - too primitive of a functionality
 // to matter
 void tensor_print(Tensor tensor, int *indices, int depth, char *prefix) {
-    int shape_len = (int) tensor_shape_len(tensor);
+    int shape_len = (int)tensor_shape_len(tensor);
     if (depth == shape_len - 1) {
         printf("%s[", prefix);
         for (size_t i = 0; i < tensor.shape[depth]; i++) {
@@ -91,15 +91,17 @@ Tensor _tensor_rand(size_t shape[], size_t shape_len) {
     assert(length && "Cannot initialize a zero or negative-shaped tensor!");
     Tensor rand_tensor = tensor_zeros(length);
     for (size_t i = 0; i < length; ++i) {
-        rand_tensor.data[i] = randf();
+        rand_tensor.data[i] = randf64();
     }
     tensor_view_from_shape(rand_tensor, shape, shape_len);
     return rand_tensor;
 }
 
 Tensor tensor_add(Tensor a, Tensor b) {
-    if (b.length == 1) return tensor_scalar_sum(a, b);
-    if (a.length == 1) return tensor_scalar_sum(b, a);
+    if (b.length == 1)
+        return tensor_scalar_sum(a, b);
+    if (a.length == 1)
+        return tensor_scalar_sum(b, a);
     assert(a.length == b.length && "Tensors need to have the same length!");
     size_t length = a.length;
     Tensor result = tensor_zeros(a.length);
@@ -110,8 +112,10 @@ Tensor tensor_add(Tensor a, Tensor b) {
 }
 
 Tensor tensor_sub(Tensor a, Tensor b) {
-    if (b.length == 1) return tensor_scalar_diff(a, b);
-    if (a.length == 1) return tensor_scalar_diff(b, a);
+    if (b.length == 1)
+        return tensor_scalar_diff(a, b);
+    if (a.length == 1)
+        return tensor_scalar_diff(b, a);
     assert(a.length == b.length && "Tensors need to have the same length!");
     size_t length = a.length;
     Tensor result = tensor_zeros(a.length);
@@ -122,8 +126,10 @@ Tensor tensor_sub(Tensor a, Tensor b) {
 }
 
 Tensor tensor_mul(Tensor a, Tensor b) {
-    if (b.length == 1) return tensor_scalar_mul(a, b);
-    if (a.length == 1) return tensor_scalar_mul(b, a);
+    if (b.length == 1)
+        return tensor_scalar_mul(a, b);
+    if (a.length == 1)
+        return tensor_scalar_mul(b, a);
     assert(a.length == b.length && "Tensors need to have the same length!");
     size_t length = a.length;
     Tensor result = tensor_zeros(a.length);
@@ -216,16 +222,31 @@ Tensor tensor_scalar_pow(Tensor base, Tensor pow) {
     assert(pow.length == 1 && "This is not a scalar value");
     size_t length = base.length;
     Tensor result = tensor_ones(base.length);
-    for (size_t i = 0; i < length; ++i) {
-        for (size_t j = 0; j < pow.data[0]; ++j) {
-            result.data[i] *= base.data[i];
+    double exponent = pow.data[0];
+    if (exponent > 0) {
+        for (size_t i = 0; i < length; ++i) {
+            for (size_t j = 0; j < exponent; ++j) {
+                result.data[i] *= base.data[i];
+            }
+        }
+    } else if (exponent < 0) {
+        for (size_t i = 0; i < length; ++i) {
+            for (size_t j = 0; j < exponent * (-1); ++j) {
+                result.data[i] *= base.data[i];
+            }
+            result.data[i] = 1 / result.data[i];
+        }
+    } else {
+        for (size_t i = 0; i < length; ++i) {
+            result.data[i] = 1;
         }
     }
     return result;
 }
 
 Tensor tensor_pow(Tensor tensor, Tensor pow) {
-    assert(tensor.length == pow.length && "Tensors need to have the same length!");
+    assert(tensor.length == pow.length &&
+           "Tensors need to have the same length!");
     size_t length = tensor.length;
     Tensor result = tensor_ones(length);
     for (size_t i = 0; i < length; ++i) {
@@ -245,15 +266,21 @@ Tensor tensor_scalar_sq(Tensor tensor) {
     return result;
 }
 
+Tensor tensor_scalar_inverted(Tensor tensor) {
+    return tensor_scalar_pow(tensor, tensor_new_scalar(-1));
+}
+
 Tensor tensor_natural_log(Tensor t) {
     Tensor result = tensor_zeros(t.length);
+    double eps = 1e-10;
     for (size_t i = 0; i < t.length; ++i) {
-        result.data[i] = (float)log((float)t.data[i]);
+        double x = t.data[i];
+        result.data[i] = (double)log(x > eps ? x : eps);
     }
     return result;
 }
 
-Tensor tensor_new_scalar(float value) {
+Tensor tensor_new_scalar(double value) {
     Tensor scalar = tensor_empty(1);
     scalar.data[0] = value;
     return scalar;

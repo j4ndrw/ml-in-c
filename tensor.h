@@ -10,7 +10,7 @@
 #define MAX_DIMS 1024
 
 typedef struct {
-    float *data;
+    double *data;
     size_t length;
     size_t shape[MAX_DIMS];
 } Tensor;
@@ -19,8 +19,8 @@ typedef struct {
 #define tensor_new(NAME, LENGTH, ...)                                          \
     Tensor NAME##_tensor;                                                      \
     do {                                                                       \
-        float NAME##_data[] = __VA_ARGS__;                                     \
-        NAME##_tensor.data = (float *)malloc(LENGTH * sizeof(float));          \
+        double NAME##_data[] = __VA_ARGS__;                                    \
+        NAME##_tensor.data = (double *)malloc(LENGTH * sizeof(double));        \
         assert(NAME##_tensor.data != NULL && "Memory allocation failed");      \
         for (size_t i = 0; i < LENGTH; ++i) {                                  \
             NAME##_tensor.data[i] = NAME##_data[i];                            \
@@ -31,8 +31,8 @@ typedef struct {
 Tensor tensor_empty(size_t length);
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);
-Tensor tensor_from(size_t length, float value);
-Tensor tensor_new_scalar(float value);
+Tensor tensor_from(size_t length, double value);
+Tensor tensor_new_scalar(double value);
 void tensor_reset_shape(Tensor *t);
 Tensor tensor_copy(Tensor tensor);
 void tensor_free(Tensor tensor);
@@ -91,43 +91,32 @@ Tensor tensor_scalar_sq(Tensor tensor);
 Tensor tensor_natural_log(Tensor t);
 
 // Derivatives
-#define chain_rule_add(result, grad) Tensor result = grad
-#define chain_rule_sub_left(result, grad) Tensor result = grad
-#define chain_rule_sub_right(result, grad)                                     \
-    Tensor result = tensor_scalar_mul(grad, tensor_new_scalar(-1))
+#define chain_rule_add(result, grad) Tensor result = (grad)
 
 #define chain_rule_mul(result, grad, tensor)                                   \
-    Tensor result = tensor_zeros(grad.length);                                 \
+    Tensor result = tensor_zeros((grad).length);                               \
     do {                                                                       \
-        for (size_t i = 0; i < grad.length; ++i) {                             \
-            result.data[i] = tensor.data[i] * grad.data[i];                    \
+        for (size_t i = 0; i < (grad).length; ++i) {                           \
+            result.data[i] = (tensor).data[i] * (grad).data[i];                \
         }                                                                      \
     } while (0)
 
 #define chain_rule_div_numerator(result, grad, tensor)                         \
-    Tensor result = tensor_zeros(grad.length);                                 \
-    do {                                                                       \
-        for (size_t i = 0; i < grad.length; ++i) {                             \
-            result.data[i] = 1 / tensor.data[i];                               \
-        }                                                                      \
-    } while (0)
+    Tensor result = tensor_div((grad), (tensor));
 
 #define chain_rule_div_denominator(result, grad, left, right)                  \
-    size_t n = grad.length;                                                    \
-    Tensor result = tensor_zeros(n);                                           \
-    {                                                                          \
-        for (size_t i = 0; i < n; ++i) {                                       \
-            float u = left.data[i];                                            \
-            float v = right.data[i];                                           \
-            result.data[i] = (-u * grad.data[i]) / (v * v);                    \
-        }                                                                      \
-    }
-
-#define chain_rule_pow(result, grad, tensor)                                   \
     Tensor result = tensor_mul(                                                \
-        grad,                                                                  \
-        tensor_pow(tensor, tensor_scalar_diff(grad, tensor_new_scalar(1))));
+        (grad), tensor_div(tensor_scalar_mul(left, tensor_new_scalar(-1)),     \
+                           tensor_scalar_sq(right)))
 
-#define chain_rule_base_pow(result, grad, tensor)                              \
+#define chain_rule_pow(result, grad, left, right)                              \
+    Tensor result = tensor_mul(                                                \
+        (grad),                                                                \
+        tensor_mul((right),                                                    \
+                   tensor_pow((left), tensor_scalar_diff(                      \
+                                          (right), tensor_new_scalar(1)))));
+
+#define chain_rule_base_pow(result, grad, left, right)                         \
     Tensor result =                                                            \
-        tensor_mul(tensor_pow(grad, tensor), tensor_natural_log(grad));
+        tensor_mul((grad), tensor_mul(tensor_pow((left), (right)),             \
+                                      tensor_natural_log((left))));

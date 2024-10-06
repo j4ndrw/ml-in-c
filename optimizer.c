@@ -1,7 +1,7 @@
 #include "optimizer.h"
 
 SGDOptimizer optimizer_sgd_create(Variable *weights, Variable *biases,
-                           float learning_rate) {
+                                  double learning_rate) {
     SGDOptimizer optimizer = {0};
     optimizer.weights = weights;
     optimizer.biases = biases;
@@ -27,10 +27,11 @@ void optimizer_sgd_step(SGDOptimizer *optimizer) {
 
 void optimizer_sgd_zero_grad(SGDOptimizer *optimizer) {
     if (optimizer->weights != NULL) {
-        optimizer->weights->grad = tensor_ones(optimizer->weights->items.length);
+        optimizer->weights->grad =
+            tensor_zeros(optimizer->weights->items.length);
     }
 
     if (optimizer->biases != NULL) {
-        optimizer->biases->grad = tensor_ones(optimizer->biases->items.length);
+        optimizer->biases->grad = tensor_zeros(optimizer->biases->items.length);
     }
 }

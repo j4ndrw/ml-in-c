@@ -21,7 +21,6 @@ typedef enum {
     OP_SCALAR_MUL,
     OP_SCALAR_POW,
     OP_SCALAR_SQ,
-    OP_SQ,
 } Op;
 
 typedef struct Variable {
@@ -71,8 +70,22 @@ void variable_backward(Variable *root);
         printf("}\n\n");                                                       \
     } while (0)
 
+#define var_print_data(v, kind, ...)                                           \
+    do {                                                                       \
+        Tensor t = v.kind;                                                     \
+        tensor_reset_shape(&t);                                                \
+        size_t shape[] = __VA_ARGS__;                                          \
+        size_t shape_len = ARR_LEN(shape);                                     \
+        tensor_view(t, __VA_ARGS__);                                           \
+        shape_len = tensor_shape_len(t);                                       \
+        printf("%s.%s = { ", #v, #kind);                                       \
+        for (size_t i = 0; i < t.length; ++i)                                  \
+            printf("%f, ", t.data[i]);                                         \
+        printf(" }\n");                                                        \
+    } while (0)
+
 #define var_new(NAME, ...)                                                     \
-    float NAME##_var_tensor_data[] = __VA_ARGS__;                              \
+    double NAME##_var_tensor_data[] = __VA_ARGS__;                             \
     tensor_new(NAME, ARR_LEN(NAME##_var_tensor_data), __VA_ARGS__);            \
     Variable NAME = variable_new(NAME##_tensor);
 #define var_from(NAME, ...) Variable NAME = variable_new(__VA_ARGS__);

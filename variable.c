@@ -15,7 +15,7 @@ Variable variable_new(Tensor tensor) {
     variable.right = (Variable *)NULL;
     variable.op = OP_LEAF;
     variable.items = tensor;
-    variable.grad = tensor_zeros(tensor.length);
+    variable.grad = tensor_ones(tensor.length);
     return variable;
 }
 
@@ -122,14 +122,13 @@ Variable variable_forward(Variable *root) {
 }
 
 void variable_backward(Variable *root) {
-    if (DUMB_NULL_CHECK(root))
+    if (DUMB_NULL_CHECK(root) ||
+        (DUMB_NULL_CHECK(root->left) && DUMB_NULL_CHECK(root->right)))
         return;
     if (DUMB_NULL_CHECK(root->left) && !DUMB_NULL_CHECK(root->right))
         return variable_backward(root->right);
     if (DUMB_NULL_CHECK(root->right) && !DUMB_NULL_CHECK(root->left))
         return variable_backward(root->left);
-    if (DUMB_NULL_CHECK(root->left) && DUMB_NULL_CHECK(root->right))
-        return;
 
     Op op = root->op;
     Tensor grad = root->grad;
@@ -141,12 +140,6 @@ void variable_backward(Variable *root) {
 #define __add_derivative                                                       \
     chain_rule_add(new_left_grad, grad);                                       \
     chain_rule_add(new_right_grad, grad);                                      \
-    left_grad = new_left_grad;                                                 \
-    right_grad = new_right_grad;
-
-#define __sub_derivative                                                       \
-    chain_rule_sub_left(new_left_grad, grad);                                  \
-    chain_rule_sub_right(new_right_grad, grad);                                \
     left_grad = new_left_grad;                                                 \
     right_grad = new_right_grad;
 
@@ -164,8 +157,8 @@ void variable_backward(Variable *root) {
     right_grad = new_right_grad;
 
 #define __pow_derivative                                                       \
-    chain_rule_pow(new_left_grad, left_items, right_grad);                     \
-    chain_rule_base_pow(new_right_grad, left_grad, right_items);               \
+    chain_rule_pow(new_left_grad, right_grad, left_items, right_items);        \
+    chain_rule_base_pow(new_right_grad, left_grad, left_items, right_items);   \
     left_grad = new_left_grad;                                                 \
     right_grad = new_right_grad;
 
@@ -173,8 +166,12 @@ void variable_backward(Variable *root) {
     do {                                                                       \
         if (op == OP) {                                                        \
             FN;                                                                \
-            root->left->grad = left_grad;                                      \
-            root->right->grad = right_grad;                                    \
+            for (size_t i = 0; i < root->left->grad.length; ++i) {             \
+                root->left->grad.data[i] = left_grad.data[i];                       \
+            }                                                                  \
+            for (size_t i = 0; i < root->right->grad.length; ++i) {             \
+                root->right->grad.data[i] = right_grad.data[i];                       \
+            }                                                                  \
             variable_backward(root->left);                                     \
             variable_backward(root->right);                                    \
             return;                                                            \
@@ -191,14 +188,14 @@ void variable_backward(Variable *root) {
     __case(OP_ADD, __add_derivative);
     __case(OP_SCALAR_SUM, __add_derivative);
     __case(OP_ACCUM_SUM, __add_derivative);
-    __case(OP_SUB, __sub_derivative);
-    __case(OP_SCALAR_DIFF, __sub_derivative);
+    __case(OP_SUB, __add_derivative);
+    __case(OP_SCALAR_DIFF, __add_derivative);
     __case(OP_MUL, __mul_derivative);
     __case(OP_DOT, __mul_derivative);
     __case(OP_SCALAR_MUL, __mul_derivative);
     __case(OP_DIV, __div_derivative);
     __case(OP_SCALAR_POW, __pow_derivative);
-    __case(OP_SQ, __pow_derivative);
+    __case(OP_SCALAR_SQ, __pow_derivative);
     __default;
 
 #undef __add_derivative
