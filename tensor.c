@@ -140,6 +140,8 @@ Tensor tensor_mul(Tensor a, Tensor b) {
 }
 
 Tensor tensor_div(Tensor a, Tensor b) {
+    if (b.length == 1)
+        return tensor_scalar_div(a, b);
     assert(a.length == b.length && "Tensors need to have the same length!");
     size_t length = a.length;
     Tensor result = tensor_zeros(a.length);
@@ -214,6 +216,17 @@ Tensor tensor_scalar_mul(Tensor t, Tensor scalar) {
     Tensor result = tensor_ones(t.length);
     for (size_t i = 0; i < length; ++i) {
         result.data[i] = scalar.data[0] * t.data[i];
+    }
+    return result;
+}
+
+Tensor tensor_scalar_div(Tensor t, Tensor scalar) {
+    assert(scalar.length == 1 && "This is not a scalar value");
+    assert(scalar.data[0] > 0 && "Division by zero");
+    size_t length = t.length;
+    Tensor result = tensor_ones(t.length);
+    for (size_t i = 0; i < length; ++i) {
+        result.data[i] = t.data[i] / scalar.data[0];
     }
     return result;
 }

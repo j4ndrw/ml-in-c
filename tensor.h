@@ -32,6 +32,7 @@ Tensor tensor_empty(size_t length);
 Tensor tensor_zeros(size_t length);
 Tensor tensor_ones(size_t length);
 Tensor tensor_from(size_t length, double value);
+#define SNEW tensor_new_scalar
 Tensor tensor_new_scalar(double value);
 void tensor_reset_shape(Tensor *t);
 Tensor tensor_copy(Tensor tensor);
@@ -76,47 +77,31 @@ Tensor _tensor_rand(size_t shape[], size_t shape_len);
 size_t tensor_shape_len(Tensor tensor);
 
 // Ops
+#define ADD tensor_add
 Tensor tensor_add(Tensor a, Tensor b);
+#define SUB tensor_sub
 Tensor tensor_sub(Tensor a, Tensor b);
+#define MUL tensor_mul
 Tensor tensor_mul(Tensor a, Tensor b);
+#define DIV tensor_div
 Tensor tensor_div(Tensor a, Tensor b);
+#define DOT tensor_dot
 Tensor tensor_dot(Tensor a, Tensor b);
+#define SUM tensor_sum
 Tensor tensor_sum(Tensor t);
+#define POW tensor_pow
 Tensor tensor_pow(Tensor tensor, Tensor pow);
+#define SSUM tensor_scalar_sum
 Tensor tensor_scalar_sum(Tensor t, Tensor scalar);
+#define SDIFF tensor_scalar_diff
 Tensor tensor_scalar_diff(Tensor t, Tensor scalar);
+#define SMUL tensor_scalar_mul
 Tensor tensor_scalar_mul(Tensor t, Tensor scalar);
+#define SDIV tensor_scalar_div
+Tensor tensor_scalar_div(Tensor t, Tensor scalar);
+#define SPOW tensor_scalar_pow
 Tensor tensor_scalar_pow(Tensor base, Tensor pow);
+#define SSQ tensor_scalar_sq
 Tensor tensor_scalar_sq(Tensor tensor);
+#define LN tensor_natural_log
 Tensor tensor_natural_log(Tensor t);
-
-// Derivatives
-#define chain_rule_add(result, grad) Tensor result = (grad)
-
-#define chain_rule_mul(result, grad, tensor)                                   \
-    Tensor result = tensor_zeros((grad).length);                               \
-    do {                                                                       \
-        for (size_t i = 0; i < (grad).length; ++i) {                           \
-            result.data[i] = (tensor).data[i] * (grad).data[i];                \
-        }                                                                      \
-    } while (0)
-
-#define chain_rule_div_numerator(result, grad, tensor)                         \
-    Tensor result = tensor_div((grad), (tensor));
-
-#define chain_rule_div_denominator(result, grad, left, right)                  \
-    Tensor result = tensor_mul(                                                \
-        (grad), tensor_div(tensor_scalar_mul(left, tensor_new_scalar(-1)),     \
-                           tensor_scalar_sq(right)))
-
-#define chain_rule_pow(result, grad, left, right)                              \
-    Tensor result = tensor_mul(                                                \
-        (grad),                                                                \
-        tensor_mul((right),                                                    \
-                   tensor_pow((left), tensor_scalar_diff(                      \
-                                          (right), tensor_new_scalar(1)))));
-
-#define chain_rule_base_pow(result, grad, left, right)                         \
-    Tensor result =                                                            \
-        tensor_mul((grad), tensor_mul(tensor_pow((left), (right)),             \
-                                      tensor_natural_log((left))));

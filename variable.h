@@ -19,6 +19,7 @@ typedef enum {
     OP_SCALAR_SUM,
     OP_SCALAR_DIFF,
     OP_SCALAR_MUL,
+    OP_SCALAR_DIV,
     OP_SCALAR_POW,
     OP_SCALAR_SQ,
 } Op;
@@ -29,14 +30,14 @@ typedef struct Variable {
     Tensor items;
     Tensor grad;
     Op op;
+    void (*backward)(struct Variable *root, struct Variable *left,
+                     struct Variable *right);
+
 } Variable;
 
 #define op(left, op, right) variable_op((left), (#op), (right))
 #define op_self(var, op) variable_op((var), (#op))
 Variable variable_op(struct Variable *left, ...);
-
-#define forward(x) variable_forward((x))
-Variable variable_forward(Variable *root);
 
 #define backward(x) variable_backward((x))
 void variable_backward(Variable *root);
